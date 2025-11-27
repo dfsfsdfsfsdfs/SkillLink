@@ -55,6 +55,81 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Error al obtener inscripciones" });
   }
 });
+// GET - Verificar si el estudiante está inscrito en una tutoría específica
+router.get("/verificar-inscripcion/:id_tutoria", async (req, res) => {
+  try {
+    const { id_tutoria } = req.params;
+    const user = req.user;
+
+    console.log("🔍 Verificando inscripción para:", {
+      usuario: user.email,
+      usuario_id: user.id_usuario,
+      tutoria_id: id_tutoria
+    });
+
+    // Buscar estudiante por email
+    const estudianteResult = await pool.query(
+      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+      [user.email]
+    );
+
+    if (estudianteResult.rows.length === 0) {
+      return res.json({
+        inscrito: false,
+        aprobado: false,
+        mensaje: "No se encontró perfil de estudiante"
+      });
+    }
+
+    const id_estudiante = estudianteResult.rows[0].id_estudiante;
+
+    // Verificar inscripción
+    const inscripcionResult = await pool.query(
+      `SELECT i.*, t.nombre_tutoria 
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+       WHERE i.id_estudiante = $1 AND i.id_tutoria = $2 AND i.activo = TRUE
+       LIMIT 1`,
+      [id_estudiante, id_tutoria]
+    );
+
+    if (inscripcionResult.rows.length === 0) {
+      return res.json({
+        inscrito: false,
+        aprobado: false,
+        mensaje: "No estás inscrito en esta tutoría"
+      });
+    }
+
+    const inscripcion = inscripcionResult.rows[0];
+    
+    // Verificar si está aprobado (depende de tu lógica de negocio)
+    // Opción 1: Si usas estado_inscripcion
+    const aprobado = inscripcion.estado_inscripcion === 'aprobada' || 
+                     inscripcion.estado_inscripcion === 'activa' ||
+                     inscripcion.estado_inscripcion === 'inscrito';
+    
+    // Opción 2: Si usas estado_solicitud
+    // const aprobado = inscripcion.estado_solicitud === 'inscrito';
+
+    return res.json({
+      inscrito: true,
+      aprobado: aprobado,
+      estado: inscripcion.estado_inscripcion,
+      estado_solicitud: inscripcion.estado_solicitud,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      nombre_tutoria: inscripcion.nombre_tutoria
+    });
+
+  } catch (error) {
+    console.error("Error al verificar inscripción:", error.message);
+    res.status(500).json({ 
+      error: "Error interno del servidor",
+      inscrito: false,
+      aprobado: false
+    });
+  }
+});
 
 // GET - Inscripción por ID (solo si está activa) - CON VERIFICACIÓN DE PERMISOS
 router.get("/:id", async (req, res) => {

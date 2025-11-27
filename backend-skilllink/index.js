@@ -22,6 +22,7 @@ import usuarioRoutes from "./src/routes/usuarioRoutes.js";
 import aprobacionRoutes from "./src/routes/aprobacionRoutes.js";
 import inscripcionesEstudianteRoutes from "./src/routes/InscripcionesEstudiante.js";
 import evaluacionesRouter from "./src/routes/evaluaciones.js";
+import entregasRouter from './src/routes/entregasTareas.js';
 dotenv.config();
 
 const app = express();
@@ -71,6 +72,7 @@ app.use("/respuestas", respuestasRouter);
 app.use('/tutores-tutoria', tutoresTutoriaRoutes);
 app.use('/inscripciones-estudiante', inscripcionesEstudianteRoutes);
 app.use("/evaluaciones", evaluacionesRouter);
+app.use('/entregas', entregasRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
@@ -92,4 +94,5 @@ app.listen(PORT, () => {
   console.log(`   POST http://localhost:${PORT}/usuarios (Registro)`);
   console.log(`   GET  http://localhost:${PORT}/usuarios/pendientes`);
   console.log(`   PUT  http://localhost:${PORT}/usuarios/:id/aprobar`);
+  
 });

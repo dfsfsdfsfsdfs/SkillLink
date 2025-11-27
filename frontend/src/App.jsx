@@ -20,6 +20,7 @@ import Tutoria from "./pages/Tutorias/Tutoria.jsx";
 import TutoriaDetalles from "./pages/Tutorias/TutoriaDetalles.jsx";
 import TutoresTutoria from './pages/Tutorias/TutoresTutoria.jsx';
 import HistorialPagos from "./pages/pagos/HistorialPagos.jsx";
+import ReporteFinanciero from "./pages/pagos/ReporteFinanciero.jsx";
 // Componente para proteger rutas
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -221,6 +222,7 @@ const App = () => {
               
               {/* 🔥 NUEVO: Ruta de Historial de Pagos CORREGIDA */}
               <Route path="pagos/historial" element={<HistorialPagos />} />
+              <Route path="pagos/reportes" element={<ReporteFinanciero/>} />
               
               {/* Puedes agregar más rutas según sea necesario */}
             </Route>

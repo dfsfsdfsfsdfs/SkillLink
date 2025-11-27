@@ -15,6 +15,44 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Error al obtener estudiantes" });
   }
 });
+// GET - Perfil del estudiante autenticado - DEBE IR ANTES DE /:id
+router.get("/mi-perfil", async (req, res) => {
+  try {
+    // Versión simplificada - usa query parameters
+    const { email, id_usuario } = req.query;
+    
+    console.log("📧 Buscando estudiante con:", { email, id_usuario });
+    
+    let result;
+    if (id_usuario) {
+      // Buscar por ID de usuario
+      result = await pool.query(
+        `SELECT e.* FROM public.estudiante e
+         JOIN public.usuario u ON e.email = u.email
+         WHERE u.id_usuario = $1 AND e.activo = TRUE`,
+        [id_usuario]
+      );
+    } else if (email) {
+      // Buscar por email
+      result = await pool.query(
+        "SELECT * FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+        [email]
+      );
+    } else {
+      return res.status(400).json({ error: "Se requiere email o id_usuario" });
+    }
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Estudiante no encontrado" });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al obtener perfil del estudiante:", error.message);
+    res.status(500).json({ error: "Error al obtener perfil del estudiante" });
+  }
+});
+
 
 // GET - Estudiante por ID (solo si está activo)
 router.get("/:id", async (req, res) => {

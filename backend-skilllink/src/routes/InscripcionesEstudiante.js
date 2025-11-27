@@ -211,5 +211,53 @@ router.delete("/:id/cancelar", async (req, res) => {
     client.release();
   }
 });
+// GET - Verificar inscripción del estudiante en una tutoría específica
+router.get("/tutoria/:id_tutoria", async (req, res) => {
+  try {
+    const { id_tutoria } = req.params;
+    const user = req.user;
+
+    // Obtener el id_estudiante del usuario
+    const estudianteResult = await pool.query(
+      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+      [user.email]
+    );
+
+    if (estudianteResult.rows.length === 0) {
+      return res.status(404).json({ error: "Estudiante no encontrado" });
+    }
+
+    const id_estudiante = estudianteResult.rows[0].id_estudiante;
+
+    // Verificar inscripción en la tutoría
+    const inscripcionResult = await pool.query(
+      `SELECT i.*, t.nombre_tutoria, t.sigla
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+       WHERE i.id_estudiante = $1 AND i.id_tutoria = $2 AND i.activo = TRUE
+       ORDER BY i.fecha_inscripcion DESC
+       LIMIT 1`,
+      [id_estudiante, id_tutoria]
+    );
+
+    if (inscripcionResult.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "No estás inscrito en esta tutoría",
+        inscrito: false
+      });
+    }
+
+    const inscripcion = inscripcionResult.rows[0];
+    
+    res.json({
+      ...inscripcion,
+      inscrito: true,
+      aprobado: inscripcion.estado_inscripcion === 'aprobada'
+    });
+  } catch (error) {
+    console.error("Error al verificar inscripción:", error.message);
+    res.status(500).json({ error: "Error al verificar inscripción" });
+  }
+});
 
 export default router;

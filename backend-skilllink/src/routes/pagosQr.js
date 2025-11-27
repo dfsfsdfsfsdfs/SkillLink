@@ -532,5 +532,102 @@ router.get("/estudiante/mis-pagos-completos", async (req, res) => {
     res.status(500).json({ error: "Error al obtener pagos" });
   }
 });
+// Agregar esto en routes/pagosQr.js - después del endpoint existente
 
+// GET - Reportes financieros completos con todos los datos necesarios
+// GET - Reportes financieros completos
+router.get("/reportes-financieros", async (req, res) => {
+  try {
+    console.log('🔐 Usuario autenticado para reportes:', req.user);
+    
+    const user = req.user;
+    
+    if (!user) {
+      return res.status(401).json({ 
+        error: "Usuario no autenticado"
+      });
+    }
+
+    let query = ``;
+    let params = [];
+    let role = '';
+
+    // TUTOR
+    if (user.id_rol === 3) { 
+      role = 'tutor';
+      
+      const tutorResult = await pool.query(
+        `SELECT id_tutor FROM public.tutor 
+         WHERE id_usuario = $1 AND activo = TRUE`,
+        [user.id_usuario]
+      );
+      
+      if (tutorResult.rows.length === 0) {
+        return res.status(403).json({ 
+          error: "No se encontró información del tutor"
+        });
+      }
+      
+      const id_tutor = tutorResult.rows[0].id_tutor;
+      
+      query = `
+        SELECT 
+          p.*, 
+          i.id_tutoria, 
+          i.id_estudiante,
+          t.nombre_tutoria, 
+          t.sigla,
+          t.id_tutor,
+          e.nombre as estudiante_nombre, 
+          e.paterno as estudiante_paterno,
+          e.email as estudiante_email,
+          inst.nombre as institucion_nombre,
+          tutor.nombre as tutor_nombre
+        FROM public.pago_qr p
+        JOIN public.inscripcion i ON p.id_inscripcion = i.id_inscripcion
+        JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+        JOIN public.estudiante e ON i.id_estudiante = e.id_estudiante
+        JOIN public.institucion inst ON t.id_institucion = inst.id_institucion
+        JOIN public.tutor tutor ON t.id_tutor = tutor.id_tutor
+        WHERE t.id_tutor = $1 AND p.activo = TRUE
+        ORDER BY p.nro_pago DESC
+      `;
+      params = [id_tutor];
+      
+    } else {
+      return res.status(403).json({ 
+        error: "No tienes permisos para acceder a estos reportes"
+      });
+    }
+
+    console.log(`📋 Buscando reportes para ${role}`);
+    
+    const result = await pool.query(query, params);
+    
+    console.log(`✅ Reportes encontrados para ${role}:`, result.rows.length);
+    
+    // Si no hay pagos, devolver array vacío pero con estructura correcta
+    const responseData = {
+      pagos: result.rows,
+      metadata: {
+        total: result.rows.length,
+        rol: role,
+        usuario: {
+          id: user.id_usuario,
+          rol: user.id_rol,
+          nombre: user.nombre || user.username
+        }
+      }
+    };
+    
+    res.json(responseData);
+    
+  } catch (error) {
+    console.error("❌ Error al obtener reportes financieros:", error.message);
+    res.status(500).json({ 
+      error: "Error al obtener reportes financieros",
+      detalles: error.message
+    });
+  }
+});
 export default router;
