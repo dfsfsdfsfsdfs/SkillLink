@@ -11,29 +11,75 @@ const TablaEstudiantes = ({ tutoriaId, puedeAprobarInscripciones }) => {
     return localStorage.getItem('authToken');
   };
 
-  // Cargar todos los estudiantes de la tutoría con información de pagos
-  const cargarEstudiantesCompleto = async () => {
-    try {
-      setLoading(true);
-      const token = getToken();
-      
-      const response = await fetch(`http://localhost:3000/inscripciones/tutoria/${tutoriaId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setEstudiantes(data);
-      } else {
-        throw new Error('Error al cargar estudiantes');
+  // Cargar todos los estudiantes de la tutoría con información de pagos y calificaciones
+// Cargar todos los estudiantes de la tutoría con información de pagos y calificaciones
+const cargarEstudiantesCompleto = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    const token = getToken();
+    
+    console.log(`🔄 Cargando estudiantes completos para tutoría ${tutoriaId}...`);
+    
+    const response = await fetch(`http://localhost:3000/inscripciones/tutoria/${tutoriaId}/completo`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (err) {
-      console.error('Error cargando estudiantes:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ ${data.length} estudiantes cargados exitosamente`);
+      setEstudiantes(data);
+    } else {
+      const errorData = await response.json();
+      console.error('❌ Error del servidor:', errorData);
+      
+      // Si falla el endpoint completo, intentar con el endpoint normal
+      console.log('🔄 Intentando cargar datos básicos...');
+      await cargarEstudiantesBasicos();
     }
-  };
+  } catch (err) {
+    console.error('❌ Error de red:', err);
+    setError('Error de conexión: ' + err.message);
+    
+    // Intentar cargar datos básicos como fallback
+    await cargarEstudiantesBasicos();
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Función fallback para cargar solo datos básicos
+const cargarEstudiantesBasicos = async () => {
+  try {
+    const token = getToken();
+    const response = await fetch(`http://localhost:3000/inscripciones/tutoria/${tutoriaId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (response.ok) {
+      const dataNormal = await response.json();
+      console.log(`🔄 Cargados ${dataNormal.length} estudiantes básicos`);
+      // Agregar calificaciones por defecto
+      const estudiantesConCalificaciones = dataNormal.map(est => ({
+        ...est,
+        calificacion_acumulada: 0,
+        puntos_evaluaciones: 0,
+        puntos_actividades: 0,
+        total_actividades: 0,
+        actividades_completadas: 0
+      }));
+      setEstudiantes(estudiantesConCalificaciones);
+    } else {
+      throw new Error('No se pudieron cargar los datos de estudiantes');
+    }
+  } catch (err) {
+    console.error('❌ Error cargando datos básicos:', err);
+    setError('No se pudieron cargar los datos de estudiantes: ' + err.message);
+  }
+};
 
   // Aprobar inscripción (Cambiar estado_solicitud a "inscrito")
   const aprobarInscripcion = async (idInscripcion) => {
@@ -58,31 +104,30 @@ const TablaEstudiantes = ({ tutoriaId, puedeAprobarInscripciones }) => {
     }
   };
 
-  // Rechazar inscripción (Cambiar estado_solicitud a "rechazado")
-// En tu frontend - función rechazarInscripcion
-const rechazarInscripcion = async (idInscripcion) => {
-  try {
-    const token = getToken();
-    const response = await fetch(`http://localhost:3000/inscripciones/${idInscripcion}/rechazar`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json', // 🔥 IMPORTANTE: incluir este header
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({}) // 🔥 Enviar objeto vacío si no hay motivo
-    });
+  // Rechazar inscripción
+  const rechazarInscripcion = async (idInscripcion) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`http://localhost:3000/inscripciones/${idInscripcion}/rechazar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({})
+      });
 
-    if (response.ok) {
-      await cargarEstudiantesCompleto();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al rechazar inscripción');
+      if (response.ok) {
+        await cargarEstudiantesCompleto();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al rechazar inscripción');
+      }
+    } catch (err) {
+      console.error('Error rechazando inscripción:', err);
+      setError(err.message);
     }
-  } catch (err) {
-    console.error('Error rechazando inscripción:', err);
-    setError(err.message);
-  }
-};
+  };
 
   // Verificar si el estudiante tiene pago completado
   const tienePagoCompletado = (estudiante) => {
@@ -119,6 +164,19 @@ const rechazarInscripcion = async (idInscripcion) => {
     return estadoSolicitud || 'Pendiente';
   };
 
+  // Obtener color para la calificación
+  const getColorCalificacion = (calificacion) => {
+    if (calificacion >= 90) return 'green';
+    if (calificacion >= 70) return 'blue';
+    if (calificacion >= 50) return 'yellow';
+    return 'red';
+  };
+
+  // Formatear calificación
+  const formatearCalificacion = (calificacion) => {
+    return calificacion ? calificacion.toFixed(1) : '0.0';
+  };
+
   useEffect(() => {
     if (tutoriaId) {
       cargarEstudiantesCompleto();
@@ -140,6 +198,9 @@ const rechazarInscripcion = async (idInscripcion) => {
     pendientes: estudiantes.filter(e => e.estado_solicitud === 'pendiente').length,
     rechazados: estudiantes.filter(e => e.estado_solicitud === 'rechazado').length,
     con_pago: estudiantes.filter(e => tienePagoCompletado(e)).length,
+    promedio_calificaciones: estudiantes.length > 0 
+      ? estudiantes.reduce((sum, e) => sum + (e.calificacion_acumulada || 0), 0) / estudiantes.length 
+      : 0
   };
 
   if (loading) {
@@ -188,7 +249,7 @@ const rechazarInscripcion = async (idInscripcion) => {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-4 gap-2 text-center">
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
             <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{estadisticas.total}</p>
             <p className="text-xs text-blue-600 dark:text-blue-400">Total</p>
@@ -201,13 +262,11 @@ const rechazarInscripcion = async (idInscripcion) => {
             <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{estadisticas.pendientes}</p>
             <p className="text-xs text-yellow-600 dark:text-yellow-400">Pendientes</p>
           </div>
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
-            <p className="text-lg font-bold text-red-600 dark:text-red-400">{estadisticas.rechazados}</p>
-            <p className="text-xs text-red-600 dark:text-red-400">Rechazados</p>
-          </div>
           <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
-            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{estadisticas.con_pago}</p>
-            <p className="text-xs text-purple-600 dark:text-purple-400">Con Pago</p>
+            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+              {estadisticas.promedio_calificaciones.toFixed(1)}
+            </p>
+            <p className="text-xs text-purple-600 dark:text-purple-400">Promedio</p>
           </div>
         </div>
       </div>
@@ -238,6 +297,12 @@ const rechazarInscripcion = async (idInscripcion) => {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Estado Pago
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Calificación
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Progreso
                 </th>
                 {puedeAprobarInscripciones && (
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -284,6 +349,31 @@ const rechazarInscripcion = async (idInscripcion) => {
                         </p>
                       )}
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <Badge color={getColorCalificacion(estudiante.calificacion_acumulada || 0)}>
+                          {formatearCalificacion(estudiante.calificacion_acumulada)}%
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full"
+                            style={{ 
+                              width: `${estudiante.total_actividades > 0 
+                                ? (estudiante.actividades_completadas / estudiante.total_actividades) * 100 
+                                : 0
+                              }%` 
+                            }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {estudiante.actividades_completadas || 0}/{estudiante.total_actividades || 0}
+                        </span>
+                      </div>
+                    </td>
                     {puedeAprobarInscripciones && (
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <div className="flex space-x-2">
@@ -320,7 +410,7 @@ const rechazarInscripcion = async (idInscripcion) => {
               ) : (
                 <tr>
                   <td 
-                    colSpan={puedeAprobarInscripciones ? "8" : "7"} 
+                    colSpan={puedeAprobarInscripciones ? "10" : "9"} 
                     className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
                   >
                     No se encontraron estudiantes con los filtros seleccionados
@@ -341,8 +431,8 @@ const rechazarInscripcion = async (idInscripcion) => {
             <p><strong>Estado Pago:</strong> Estado del pago QR asociado a la inscripción</p>
           </div>
           <div>
-            <p><strong>Inscribir:</strong> Aprueba la solicitud (cambia estado a "inscrito")</p>
-            <p><strong>Rechazar:</strong> Rechaza la solicitud (cambia estado a "rechazado")</p>
+            <p><strong>Calificación:</strong> Promedio acumulado de evaluaciones y actividades</p>
+            <p><strong>Progreso:</strong> Progreso en actividades completadas vs total</p>
           </div>
         </div>
       </div>

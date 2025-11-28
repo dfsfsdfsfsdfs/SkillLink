@@ -67,6 +67,25 @@ const PreguntaModal = ({
             </select>
           </div>
 
+          {/* 🔥 NUEVO: Campo para nota de la pregunta */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Nota de la Pregunta
+            </label>
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={formData.nota_pregunta}
+              onChange={(e) => onInputChange('nota_pregunta', parseFloat(e.target.value) || 1)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="1.0"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Puntos que vale esta pregunta en la evaluación
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Número de Orden
@@ -105,6 +124,142 @@ const PreguntaModal = ({
   );
 };
 
+// 🔥 NUEVO: Modal para gestionar opciones con marcado de respuesta correcta
+const OpcionesModal = ({ 
+  show, 
+  pregunta, 
+  opciones, 
+  onClose, 
+  onMarcarCorrecta,
+  puedeGestionar 
+}) => {
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                Opciones de Respuesta
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {pregunta?.descripcion}
+              </p>
+              <div className="flex items-center space-x-4 mt-2 text-sm">
+                <span className="text-gray-500 dark:text-gray-400">
+                  Valor: {pregunta?.nota_pregunta || 1} punto(s)
+                </span>
+                {pregunta?.inciso_correcto && (
+                  <span className="text-green-600 dark:text-green-400 font-medium">
+                    ✓ Respuesta correcta configurada
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-4"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Lista de opciones */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {opciones.length > 0 ? (
+            <div className="space-y-4">
+              {opciones.map((opcion) => (
+                <div 
+                  key={opcion.inciso}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    pregunta?.inciso_correcto === opcion.inciso
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                      : 'border-gray-200 dark:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                          pregunta?.inciso_correcto === opcion.inciso
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                        }`}>
+                          {String.fromCharCode(64 + opcion.inciso)} {/* A, B, C, D */}
+                        </span>
+                        {pregunta?.inciso_correcto === opcion.inciso && (
+                          <span className="text-green-600 dark:text-green-400 text-sm font-medium flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Correcta
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-700 dark:text-gray-300">
+                        {opcion.respuesta_opcion}
+                      </p>
+                    </div>
+                    
+                    {puedeGestionar && (
+                      <button
+                        onClick={() => onMarcarCorrecta(pregunta.numero_preg, opcion.inciso)}
+                        className={`ml-4 px-4 py-2 text-sm rounded-lg transition-colors ${
+                          pregunta?.inciso_correcto === opcion.inciso
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        {pregunta?.inciso_correcto === opcion.inciso ? 'Correcta' : 'Marcar como Correcta'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                No hay opciones
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400">
+                Esta pregunta no tiene opciones configuradas.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+          <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
+            <span>
+              {pregunta?.inciso_correcto 
+                ? `Respuesta correcta: ${String.fromCharCode(64 + pregunta.inciso_correcto)}`
+                : 'Sin respuesta correcta configurada'
+              }
+            </span>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Preguntas = ({ evaluacion }) => {
   const { id } = useParams(); // ID de la tutoría
   const [preguntas, setPreguntas] = useState([]);
@@ -115,14 +270,16 @@ const Preguntas = ({ evaluacion }) => {
   const { getAuthToken, user } = useAuth();
   const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const [preguntaSeleccionada, setPreguntaSeleccionada] = useState(null);
+  const [opcionesPregunta, setOpcionesPregunta] = useState([]);
 
-  // Estado del formulario - ACTUALIZADO para evaluaciones
+  // Estado del formulario - ACTUALIZADO con nota_pregunta
   const [formData, setFormData] = useState({
     descripcion: '',
     tipo_pregun: 'multiple',
     id_tutoria: id,
     id_evaluacion: evaluacion?.id_evaluacion || null,
-    numero_orden: 1
+    numero_orden: 1,
+    nota_pregunta: 1.0
   });
 
   // Determinar permisos según el rol
@@ -152,6 +309,52 @@ const Preguntas = ({ evaluacion }) => {
       }
     } catch (err) {
       console.error('Error cargando información de tutoría:', err);
+    }
+  };
+
+  // 🔥 FUNCIÓN: Marcar opción como correcta
+  const marcarComoCorrecta = async (preguntaId, inciso) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`http://localhost:3000/preguntas/${preguntaId}/correcta`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ inciso_correcto: inciso })
+      });
+
+      if (response.ok) {
+        await cargarPreguntas();
+        // Recargar opciones si estamos viendo esa pregunta
+        if (preguntaSeleccionada && preguntaSeleccionada.numero_preg === preguntaId) {
+          await cargarOpcionesPregunta(preguntaId);
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al marcar respuesta correcta');
+      }
+    } catch (err) {
+      setError('Error al marcar respuesta correcta: ' + err.message);
+    }
+  };
+
+  // 🔥 FUNCIÓN: Cargar opciones de una pregunta específica
+  const cargarOpcionesPregunta = async (preguntaId) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`http://localhost:3000/opciones/pregunta/${preguntaId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const opcionesData = await response.json();
+        setOpcionesPregunta(opcionesData);
+      }
+    } catch (err) {
+      console.error('Error cargando opciones:', err);
+      setOpcionesPregunta([]);
     }
   };
 
@@ -315,14 +518,16 @@ const Preguntas = ({ evaluacion }) => {
     }
   };
 
-  const abrirOpciones = (pregunta) => {
+  const abrirOpciones = async (pregunta) => {
     setPreguntaSeleccionada(pregunta);
+    await cargarOpcionesPregunta(pregunta.numero_preg);
     setMostrarOpciones(true);
   };
 
   const cerrarOpciones = () => {
     setMostrarOpciones(false);
     setPreguntaSeleccionada(null);
+    setOpcionesPregunta([]);
   };
 
   const resetForm = () => {
@@ -331,7 +536,8 @@ const Preguntas = ({ evaluacion }) => {
       tipo_pregun: 'multiple',
       id_tutoria: id,
       id_evaluacion: evaluacion?.id_evaluacion || null,
-      numero_orden: 1
+      numero_orden: 1,
+      nota_pregunta: 1.0
     });
   };
 
@@ -356,10 +562,12 @@ const Preguntas = ({ evaluacion }) => {
       tipo_pregun: pregunta.tipo_pregun,
       id_tutoria: id,
       id_evaluacion: evaluacion?.id_evaluacion || null,
-      numero_orden: pregunta.numero_orden || 1
+      numero_orden: pregunta.numero_orden || 1,
+      nota_pregunta: pregunta.nota_pregunta || 1.0
     });
     setShowModal(true);
   };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -375,7 +583,8 @@ const Preguntas = ({ evaluacion }) => {
       crearPregunta(formData);
     }
   };
-    const handleCloseModal = () => {
+
+  const handleCloseModal = () => {
     setShowModal(false);
     setEditingPregunta(null);
     resetForm();
@@ -387,7 +596,6 @@ const Preguntas = ({ evaluacion }) => {
       cargarPreguntas();
     }
   }, [id, evaluacion]);
-
 
   const getTipoPreguntaBadge = (tipo) => {
     const tipos = {
@@ -409,6 +617,33 @@ const Preguntas = ({ evaluacion }) => {
     return (
       <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full">
         Orden: {orden}
+      </span>
+    );
+  };
+
+  const getNotaPreguntaBadge = (nota) => {
+    return (
+      <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 rounded-full">
+        {nota || 1} punto(s)
+      </span>
+    );
+  };
+
+  const getRespuestaCorrectaBadge = (pregunta) => {
+    if (!pregunta.inciso_correcto) {
+      return (
+        <span className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded-full">
+          Sin respuesta correcta
+        </span>
+      );
+    }
+    
+    return (
+      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded-full flex items-center">
+        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        Correcta: {String.fromCharCode(64 + pregunta.inciso_correcto)}
       </span>
     );
   };
@@ -440,7 +675,7 @@ const Preguntas = ({ evaluacion }) => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{preguntas.length} pregunta(s) en esta evaluación</span>
+              <span>{preguntas.length} pregunta(s) - Total: {preguntas.reduce((sum, p) => sum + (p.nota_pregunta || 1), 0)} puntos</span>
             </div>
           )}
         </div>
@@ -476,7 +711,7 @@ const Preguntas = ({ evaluacion }) => {
         </div>
       )}
 
-      {/* Lista de preguntas - ACTUALIZADO con orden */}
+      {/* Lista de preguntas - ACTUALIZADO con orden y nota */}
       {preguntas.length > 0 ? (
         <div className="space-y-4">
           {preguntas
@@ -494,6 +729,8 @@ const Preguntas = ({ evaluacion }) => {
                     </h3>
                     {getTipoPreguntaBadge(pregunta.tipo_pregun)}
                     {getOrdenPreguntaBadge(pregunta.numero_orden || 1)}
+                    {getNotaPreguntaBadge(pregunta.nota_pregunta)}
+                    {getRespuestaCorrectaBadge(pregunta)}
                   </div>
                   
                   <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
@@ -532,9 +769,9 @@ const Preguntas = ({ evaluacion }) => {
                     <button 
                       onClick={() => abrirOpciones(pregunta)}
                       className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors px-3 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                      title="Gestionar opciones"
+                      title="Gestionar opciones y respuesta correcta"
                     >
-                      Opciones
+                      Respuesta Correcta
                     </button>
                   </div>
                 )}
@@ -569,7 +806,7 @@ const Preguntas = ({ evaluacion }) => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal de Pregunta */}
       <PreguntaModal
         show={showModal}
         editingPregunta={editingPregunta}
@@ -583,14 +820,15 @@ const Preguntas = ({ evaluacion }) => {
         isAdmin={isAdmin}
       />
       
-      {/* Modal de Opciones */}
-      {mostrarOpciones && preguntaSeleccionada && (
-        <Opciones
-          preguntaId={preguntaSeleccionada.numero_preg}
-          preguntaDescripcion={preguntaSeleccionada.descripcion}
-          onClose={cerrarOpciones}
-        />
-      )}
+      {/* 🔥 NUEVO: Modal de Opciones con Respuesta Correcta */}
+      <OpcionesModal
+        show={mostrarOpciones}
+        pregunta={preguntaSeleccionada}
+        opciones={opcionesPregunta}
+        onClose={cerrarOpciones}
+        onMarcarCorrecta={marcarComoCorrecta}
+        puedeGestionar={puedeGestionarPreguntas()}
+      />
     </div>
   );
 };

@@ -31,6 +31,7 @@ const TutoriaDetalles = () => {
   // Agrega estos estados con los otros estados
   const [contadorActividades, setContadorActividades] = useState(0);
   const [contadorPreguntas, setContadorPreguntas] = useState(0);
+  const [estudianteInscrito, setEstudianteInscrito] = useState(false);
   // Determinar permisos según el rol
   const userRole = user?.id_rol;
   const isAdmin = userRole === 1;
@@ -67,7 +68,80 @@ const puedeGestionarPreguntas = () => {
   
   return false;
 };
+// 🔥 NUEVAS FUNCIONES: Permisos para VER las secciones
+const puedeVerActividades = () => {
+  if (!tutoria) return false;
 
+  // Admin puede ver todo
+  if (isAdmin) return true;
+  
+  // Gerente solo si la tutoría es de su institución
+  if (isGerente) {
+    return tutoria.gerente_pertenece_a_institucion === true;
+  }
+  
+  // Tutor solo si está dando esa tutoría
+  if (isTutor) {
+    return tutoria.tutor_pertenece_al_usuario === true;
+  }
+  
+  // Estudiante solo si está inscrito en esta tutoría
+  if (isEstudiante) {
+    // Aquí necesitas verificar si el estudiante está inscrito
+    // Puedes usar el estado estudianteInscrito que ya tienes
+    return estudianteInscrito;
+  }
+  
+  return false;
+};
+
+const puedeVerEvaluaciones = () => {
+  if (!tutoria) return false;
+
+  // Admin puede ver todo
+  if (isAdmin) return true;
+  
+  // Gerente solo si la tutoría es de su institución
+  if (isGerente) {
+    return tutoria.gerente_pertenece_a_institucion === true;
+  }
+  
+  // Tutor solo si está dando esa tutoría
+  if (isTutor) {
+    return tutoria.tutor_pertenece_al_usuario === true;
+  }
+  
+  // Estudiante solo si está inscrito en esta tutoría
+  if (isEstudiante) {
+    return estudianteInscrito;
+  }
+  
+  return false;
+};
+
+const puedeVerGestionEstudiantes = () => {
+  if (!tutoria) return false;
+
+  // Admin puede ver todo
+  if (isAdmin) return true;
+  
+  // Gerente solo si la tutoría es de su institución
+  if (isGerente) {
+    return tutoria.gerente_pertenece_a_institucion === true;
+  }
+  
+  // Tutor solo si está dando esa tutoría
+  if (isTutor) {
+    return tutoria.tutor_pertenece_al_usuario === true;
+  }
+  
+  // Estudiantes NO pueden ver la gestión de estudiantes
+  if (isEstudiante) {
+    return false;
+  }
+  
+  return false;
+};
 const gerentePerteneceAInstitucion = () => {
   if (!user || !tutoria) return false;
   return isGerente && tutoria.gerente_pertenece_a_institucion === true;

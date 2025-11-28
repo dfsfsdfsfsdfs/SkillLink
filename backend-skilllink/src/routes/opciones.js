@@ -45,7 +45,7 @@ router.get("/:inciso/:numero_preg", async (req, res) => {
 router.get("/pregunta/:numero_preg", async (req, res) => {
   try {
     const { numero_preg } = req.params;
-    console.log('Buscando opciones para pregunta:', numero_preg); // Debug
+    console.log('Buscando opciones para pregunta:', numero_preg);
     
     // Primero verifiquemos si la pregunta existe
     const preguntaCheck = await pool.query(
@@ -53,7 +53,7 @@ router.get("/pregunta/:numero_preg", async (req, res) => {
       [numero_preg]
     );
     
-    console.log('Pregunta encontrada:', preguntaCheck.rows.length); // Debug
+    console.log('Pregunta encontrada:', preguntaCheck.rows.length);
     
     if (preguntaCheck.rows.length === 0) {
       return res.status(404).json({ error: "Pregunta no encontrada o deshabilitada" });
@@ -68,11 +68,10 @@ router.get("/pregunta/:numero_preg", async (req, res) => {
       [numero_preg]
     );
     
-    console.log('Opciones encontradas:', result.rows.length); // Debug
+    console.log('Opciones encontradas:', result.rows.length);
     res.json(result.rows);
   } catch (error) {
     console.error("Error detallado al obtener opciones:", error.message);
-    console.error("Stack trace:", error.stack);
     res.status(500).json({ error: "Error al obtener opciones: " + error.message });
   }
 });
@@ -119,6 +118,7 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error("Error al crear opción:", error);
     res.status(500).json({ error: "Error al crear opción" });
   }
 });
@@ -143,6 +143,7 @@ router.put("/:inciso/:numero_preg", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
+    console.error("Error al actualizar opción:", error);
     res.status(500).json({ error: "Error al actualizar opción" });
   }
 });
@@ -169,6 +170,7 @@ router.delete("/:inciso/:numero_preg", async (req, res) => {
       opcion: result.rows[0]
     });
   } catch (error) {
+    console.error("Error al deshabilitar opción:", error);
     res.status(500).json({ error: "Error al deshabilitar opción" });
   }
 });
@@ -204,6 +206,7 @@ router.patch("/:inciso/:numero_preg/activar", async (req, res) => {
       opcion: result.rows[0]
     });
   } catch (error) {
+    console.error("Error al reactivar opción:", error);
     res.status(500).json({ error: "Error al reactivar opción" });
   }
 });
@@ -225,6 +228,7 @@ router.delete("/pregunta/:numero_preg", async (req, res) => {
       opciones: result.rows
     });
   } catch (error) {
+    console.error("Error al deshabilitar opciones:", error);
     res.status(500).json({ error: "Error al deshabilitar opciones" });
   }
 });

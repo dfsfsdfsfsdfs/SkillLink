@@ -20,7 +20,7 @@ const Actividad = () => {
   const [entregaSeleccionada, setEntregaSeleccionada] = useState(null);
   const [actividadSeleccionada, setActividadSeleccionada] = useState(null);
   const [misEntregas, setMisEntregas] = useState([]);
-  const [estudianteInscrito, setEstudianteInscrito] = useState(false); // Nuevo estado
+  const [estudianteInscrito, setEstudianteInscrito] = useState(false);
 
   // Datos formulario
   const [formData, setFormData] = useState({
@@ -54,7 +54,34 @@ const Actividad = () => {
     return getAuthToken ? getAuthToken() : localStorage.getItem("authToken");
   }, [getAuthToken]);
 
-  // Cargar información de tutoría
+  // Función para obtener el nombre completo del tutor
+  const obtenerNombreTutor = useCallback((actividad) => {
+    if (!actividad) return "";
+    
+    // Si la actividad tiene tutor_nombre y tutor_apellido_paterno, úsalos
+    if (actividad.tutor_nombre && actividad.tutor_apellido_paterno) {
+      return `${actividad.tutor_nombre} ${actividad.tutor_apellido_paterno}${actividad.tutor_apellido_materno ? ' ' + actividad.tutor_apellido_materno : ''}`;
+    }
+    
+    // Si no hay información del tutor en la actividad, usar la de la tutoría
+    if (tutoriaInfo && tutoriaInfo.tutor_nombre) {
+      return `${tutoriaInfo.tutor_nombre} ${tutoriaInfo.tutor_apellido_paterno}${tutoriaInfo.tutor_apellido_materno ? ' ' + tutoriaInfo.tutor_apellido_materno : ''}`;
+    }
+    
+    return "Tutor no asignado";
+  }, [tutoriaInfo]);
+
+  // Función para obtener iniciales (como en TutoriaDetalles)
+  const getIniciales = (nombre) => {
+    if (!nombre) return 'TU';
+    const palabras = nombre.split(' ').filter(word => word.trim() !== '');
+    if (palabras.length >= 2) {
+      return (palabras[0].charAt(0) + palabras[1].charAt(0)).toUpperCase();
+    }
+    return nombre.substring(0, 2).toUpperCase();
+  };
+
+  // Cargar información de tutoría (igual que en TutoriaDetalles)
   const cargarTutoriaInfo = useCallback(async () => {
     try {
       const token = getToken();
@@ -65,18 +92,11 @@ const Actividad = () => {
       if (response.ok) {
         const tutoriaData = await response.json();
         setTutoriaInfo(tutoriaData);
-
-        if (isTutor && tutoriaData.tutor_pertenece_al_usuario) {
-          setFormData((prev) => ({
-            ...prev,
-            id_tutor: user.id_usuario,
-          }));
-        }
       }
     } catch (err) {
       console.error("Error cargando información de tutoría:", err);
     }
-  }, [getToken, id, isTutor, user]);
+  }, [getToken, id]);
 
   // Cargar actividades
   const cargarActividades = useCallback(async () => {
@@ -103,103 +123,97 @@ const Actividad = () => {
     }
   }, [getToken, id]);
 
-const cargarMisEntregas = useCallback(async () => {
-  if (!isEstudiante) return;
-  
-  try {
-    const token = getToken();
+  // Cargar mis entregas
+  const cargarMisEntregas = useCallback(async () => {
+    if (!isEstudiante) return;
     
-    // Primero obtener el perfil del estudiante - CORREGIR LA URL
-    const estudianteResponse = await fetch(
-      `http://localhost:3000/estudiantes/mi-perfil?email=${encodeURIComponent(user.email)}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    if (!estudianteResponse.ok) {
-      console.log("No se pudo obtener el perfil del estudiante");
-      return;
-    }
-
-    const estudianteData = await estudianteResponse.json();
-    const id_estudiante = estudianteData.id_estudiante;
-
-    // Ahora cargar las entregas del estudiante - CORREGIR LA URL
-    const response = await fetch(
-      `http://localhost:3000/entregas/estudiante/mis-entregas?id_estudiante=${id_estudiante}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      setMisEntregas(data);
-    }
-  } catch (err) {
-    console.error("Error cargando mis entregas:", err);
-  }
-}, [getToken, isEstudiante, user.email]);
-
-// NUEVA FUNCIÓN: Verificar si el estudiante está inscrito en la tutoría
-// FUNCIÓN ALTERNATIVA: Usando endpoint existente
-const verificarInscripcionEstudiante = useCallback(async () => {
-  if (!isEstudiante) return;
-
-  try {
-    const token = getToken();
-    
-    // Primero obtener el ID del estudiante
-    const estudianteResponse = await fetch(
-      `http://localhost:3000/estudiantes/mi-perfil?email=${encodeURIComponent(user.email)}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    if (!estudianteResponse.ok) {
-      setEstudianteInscrito(false);
-      return;
-    }
-
-    const estudianteData = await estudianteResponse.json();
-    const id_estudiante = estudianteData.id_estudiante;
-
-    // Obtener todas las inscripciones del estudiante
-    const inscripcionesResponse = await fetch(
-      `http://localhost:3000/inscripciones/estudiante/${id_estudiante}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    if (inscripcionesResponse.ok) {
-      const inscripcionesData = await inscripcionesResponse.json();
+    try {
+      const token = getToken();
       
-      // Verificar si está inscrito en esta tutoría específica
-      const inscripcionEnTutoria = inscripcionesData.find(
-        inscripcion => inscripcion.id_tutoria === parseInt(id)
+      const estudianteResponse = await fetch(
+        `http://localhost:3000/estudiantes/mi-perfil?email=${encodeURIComponent(user.email)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
+
+      if (!estudianteResponse.ok) {
+        console.log("No se pudo obtener el perfil del estudiante");
+        return;
+      }
+
+      const estudianteData = await estudianteResponse.json();
+      const id_estudiante = estudianteData.id_estudiante;
+
+      const response = await fetch(
+        `http://localhost:3000/entregas/estudiante/mis-entregas?id_estudiante=${id_estudiante}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setMisEntregas(data);
+      }
+    } catch (err) {
+      console.error("Error cargando mis entregas:", err);
+    }
+  }, [getToken, isEstudiante, user.email]);
+
+  // Verificar inscripción estudiante
+  const verificarInscripcionEstudiante = useCallback(async () => {
+    if (!isEstudiante) return;
+
+    try {
+      const token = getToken();
       
-      if (inscripcionEnTutoria) {
-        // Verificar si está aprobado
-        const aprobado = inscripcionEnTutoria.estado_inscripcion === 'aprobada' || 
-                        inscripcionEnTutoria.estado_inscripcion === 'activa' ||
-                        inscripcionEnTutoria.estado_solicitud === 'inscrito';
+      const estudianteResponse = await fetch(
+        `http://localhost:3000/estudiantes/mi-perfil?email=${encodeURIComponent(user.email)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!estudianteResponse.ok) {
+        setEstudianteInscrito(false);
+        return;
+      }
+
+      const estudianteData = await estudianteResponse.json();
+      const id_estudiante = estudianteData.id_estudiante;
+
+      const inscripcionesResponse = await fetch(
+        `http://localhost:3000/inscripciones/estudiante/${id_estudiante}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (inscripcionesResponse.ok) {
+        const inscripcionesData = await inscripcionesResponse.json();
         
-        setEstudianteInscrito(aprobado);
+        const inscripcionEnTutoria = inscripcionesData.find(
+          inscripcion => inscripcion.id_tutoria === parseInt(id)
+        );
+        
+        if (inscripcionEnTutoria) {
+          const aprobado = inscripcionEnTutoria.estado_inscripcion === 'aprobada' || 
+                          inscripcionEnTutoria.estado_inscripcion === 'activa' ||
+                          inscripcionEnTutoria.estado_solicitud === 'inscrito';
+          
+          setEstudianteInscrito(aprobado);
+        } else {
+          setEstudianteInscrito(false);
+        }
       } else {
         setEstudianteInscrito(false);
       }
-    } else {
+    } catch (err) {
+      console.error("Error verificando inscripción:", err);
       setEstudianteInscrito(false);
     }
-  } catch (err) {
-    console.error("Error verificando inscripción:", err);
-    setEstudianteInscrito(false);
-  }
-}, [getToken, id, isEstudiante, user.email]);
+  }, [getToken, id, isEstudiante, user.email]);
 
   // Cargar entregas por actividad
   const cargarEntregas = useCallback(async (id_actividad) => {
@@ -225,7 +239,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
     }
   }, [getToken, actividades]);
 
-  // Permisos
+  // Permisos (igual que en TutoriaDetalles)
   const puedeGestionarActividades = useCallback(() => {
     if (!tutoriaInfo) return false;
     if (isAdmin) return true;
@@ -237,16 +251,15 @@ const verificarInscripcionEstudiante = useCallback(async () => {
   const puedeVerEntregas = useCallback((actividad) => {
     if (isAdmin) return true;
     if (isGerente) return tutoriaInfo?.gerente_pertenece_a_institucion === true;
-    if (isTutor) return actividad?.id_tutor === user.id_usuario;
+    if (isTutor) return tutoriaInfo?.tutor_pertenece_al_usuario === true;
     return false;
-  }, [tutoriaInfo, isAdmin, isGerente, isTutor, user]);
+  }, [tutoriaInfo, isAdmin, isGerente, isTutor]);
 
-  // NUEVA FUNCIÓN: Verificar si puede entregar una actividad específica
+  // Verificar si puede entregar una actividad específica
   const puedeEntregarActividad = useCallback((actividad) => {
     if (!isEstudiante) return false;
     if (!estudianteInscrito) return false;
     
-    // Verificar si la fecha de presentación ya pasó
     const fechaPresentacion = new Date(actividad.fecha_presentacion);
     const hoy = new Date();
     return hoy <= fechaPresentacion;
@@ -261,9 +274,9 @@ const verificarInscripcionEstudiante = useCallback(async () => {
       fecha_presentacion: "",
       nota_act: "",
       id_tutoria: id,
-      id_tutor: isTutor ? user.id_usuario : "",
+      id_tutor: "",
     });
-  }, [id, isTutor, user]);
+  }, [id]);
 
   const resetEntregaForm = useCallback(() => {
     setEntregaFormData({
@@ -333,7 +346,6 @@ const verificarInscripcionEstudiante = useCallback(async () => {
   );
 
   const abrirModalEntrega = useCallback((actividad) => {
-    // Verificar nuevamente si puede entregar
     if (!puedeEntregarActividad(actividad)) {
       setError("No puedes entregar esta tarea. Verifica tu inscripción o la fecha de entrega.");
       return;
@@ -352,7 +364,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
     setShowCalificarModal(true);
   }, []);
 
-  // CRUD operations (mantener igual que antes)
+  // CRUD operations
   const crearActividad = useCallback(
     async (formData) => {
       try {
@@ -467,6 +479,21 @@ const verificarInscripcionEstudiante = useCallback(async () => {
   const entregarTarea = useCallback(async () => {
     try {
       const token = getToken();
+      
+      const estudianteResponse = await fetch(
+        `http://localhost:3000/estudiantes/mi-perfil?email=${encodeURIComponent(user.email)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!estudianteResponse.ok) {
+        throw new Error("No se pudo obtener el perfil del estudiante");
+      }
+
+      const estudianteData = await estudianteResponse.json();
+      const id_estudiante = estudianteData.id_estudiante;
+
       const response = await fetch("http://localhost:3000/entregas", {
         method: "POST",
         headers: {
@@ -475,6 +502,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
         },
         body: JSON.stringify({
           id_actividad: actividadSeleccionada.id_actividad,
+          id_estudiante: id_estudiante,
           url_drive: entregaFormData.url_drive
         }),
       });
@@ -488,10 +516,13 @@ const verificarInscripcionEstudiante = useCallback(async () => {
       setShowEntregaModal(false);
       resetEntregaForm();
       setError(null);
+      alert("¡Tarea entregada correctamente!");
+      
     } catch (err) {
       setError(err.message);
+      console.error("Error al entregar tarea:", err);
     }
-  }, [getToken, actividadSeleccionada, entregaFormData, cargarMisEntregas, resetEntregaForm]);
+  }, [getToken, actividadSeleccionada, entregaFormData, cargarMisEntregas, resetEntregaForm, user.email]);
 
   const calificarTarea = useCallback(async () => {
     try {
@@ -513,7 +544,6 @@ const verificarInscripcionEstudiante = useCallback(async () => {
         throw new Error(errorData.error || "Error al calificar tarea");
       }
 
-      // Recargar entregas si estamos en el modal de entregas
       if (showEntregasModal) {
         await cargarEntregas(actividadSeleccionada.id_actividad);
       }
@@ -526,7 +556,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
     }
   }, [getToken, entregaSeleccionada, calificacionFormData, showEntregasModal, actividadSeleccionada, cargarEntregas, resetCalificacionForm]);
 
-  // Form submissions (mantener igual)
+  // Form submissions
   const handleSubmit = useCallback(
     (e) => {
       e.preventDefault();
@@ -546,7 +576,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
     calificarTarea();
   }, [calificarTarea]);
 
-  // Close modals (mantener igual)
+  // Close modals
   const handleCloseModal = useCallback(() => {
     setShowModal(false);
     setEditingActividad(null);
@@ -571,14 +601,14 @@ const verificarInscripcionEstudiante = useCallback(async () => {
     resetEntregaForm();
   }, [resetEntregaForm]);
 
-  // Efectos iniciales - AGREGAR la nueva función
+  // Efectos iniciales
   useEffect(() => {
     if (id) {
       cargarTutoriaInfo();
       cargarActividades();
       if (isEstudiante) {
         cargarMisEntregas();
-        verificarInscripcionEstudiante(); // Llamar a la nueva función
+        verificarInscripcionEstudiante();
       }
     }
   }, [id, cargarTutoriaInfo, cargarActividades, isEstudiante, cargarMisEntregas, verificarInscripcionEstudiante]);
@@ -641,6 +671,7 @@ const verificarInscripcionEstudiante = useCallback(async () => {
             const miEntrega = isEstudiante ? obtenerMiEntrega(actividad.id_actividad) : null;
             const puedeEntregar = puedeEntregarActividad(actividad);
             const fechaPasada = new Date(actividad.fecha_presentacion) < new Date();
+            const nombreTutor = obtenerNombreTutor(actividad);
             
             return (
               <div
@@ -690,8 +721,8 @@ const verificarInscripcionEstudiante = useCallback(async () => {
                         {new Date(actividad.fecha_presentacion).toLocaleDateString()}
                         {fechaPasada && " (Vencida)"}
                       </span>
-                      {actividad.tutor_nombre && (
-                        <span>Por: {actividad.tutor_nombre}</span>
+                      {nombreTutor && (
+                        <span>Por: {nombreTutor}</span>
                       )}
                       {isEstudiante && miEntrega && miEntrega.calificacion && (
                         <span className="font-semibold text-green-600 dark:text-green-400">
@@ -799,19 +830,117 @@ const verificarInscripcionEstudiante = useCallback(async () => {
       )}
 
       {/* Modal Crear/Editar Actividad */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg p-6 relative">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              {editingActividad ? "Editar Actividad" : "Nueva Actividad"}
-            </h3>
+{/* Modal Crear/Editar Actividad */}
+{showModal && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg p-6 relative">
+      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        {editingActividad ? "Editar Actividad" : "Nueva Actividad"}
+      </h3>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* ... (formulario de actividad existente) */}
-            </form>
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Nombre */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Nombre de la Actividad *
+          </label>
+          <input
+            type="text"
+            value={formData.nombre}
+            onChange={(e) => handleInputChange("nombre", e.target.value)}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            placeholder="Ej: Tarea 1 - Introducción a React"
+            required
+          />
         </div>
-      )}
+
+        {/* Descripción */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Descripción
+          </label>
+          <textarea
+            value={formData.descripcion}
+            onChange={(e) => handleInputChange("descripcion", e.target.value)}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            placeholder="Describe la actividad, los objetivos y requisitos..."
+            rows="3"
+          />
+        </div>
+
+        {/* Fecha de Publicación */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Fecha de Publicación *
+          </label>
+          <input
+            type="date"
+            value={formData.fecha_publicacion}
+            onChange={(e) => handleInputChange("fecha_publicacion", e.target.value)}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            required
+          />
+        </div>
+
+        {/* Fecha de Presentación */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Fecha Límite de Entrega *
+          </label>
+          <input
+            type="date"
+            value={formData.fecha_presentacion}
+            onChange={(e) => handleInputChange("fecha_presentacion", e.target.value)}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            required
+          />
+        </div>
+
+        {/* Nota Máxima */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Puntaje Máximo
+          </label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={formData.nota_act}
+            onChange={(e) => handleInputChange("nota_act", e.target.value)}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            placeholder="Ej: 20 (dejar vacío si no tiene calificación)"
+          />
+        </div>
+
+        {/* Información del Tutor (solo lectura si está editando) */}
+        {editingActividad && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Tutor asignado:</strong> {obtenerNombreTutor(editingActividad)}
+            </p>
+          </div>
+        )}
+
+        {/* Botones */}
+        <div className="flex justify-end space-x-3 pt-4">
+          <button
+            type="button"
+            onClick={handleCloseModal}
+            className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            {editingActividad ? "Actualizar" : "Crear"} Actividad
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
       {/* Modal Entregas */}
       {showEntregasModal && actividadSeleccionada && (

@@ -1196,5 +1196,137 @@ router.get("/estadisticas/resumen", async (req, res) => {
     res.status(500).json({ error: "Error al obtener estadísticas" });
   }
 });
+// GET - Inscripciones por tutoría con calificaciones y pagos REALES
+router.get("/tutoria/:id/completo", async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔍 Cargando estudiantes para tutoría: ${id}`);
+    
+    // Consulta base CON la tabla pago_qr
+    const inscripciones = await pool.query(`
+      SELECT 
+        i.id_inscripcion,
+        i.estado_solicitud,
+        i.fecha_inscripcion,
+        e.id_estudiante,
+        e.nombre as estudiante_nombre,
+        e.paterno,
+        e.materno,
+        e.email,
+        e.carrera,
+        pq.nro_pago,
+        pq.estado_pago,
+        pq.fecha_de_pago,
+        pq.monto,
+        pq.codigo_transaccion
+      FROM public.inscripcion i
+      JOIN public.estudiante e ON i.id_estudiante = e.id_estudiante
+      LEFT JOIN public.pago_qr pq ON i.id_inscripcion = pq.id_inscripcion AND pq.activo = TRUE
+      WHERE i.id_tutoria = $1
+      ORDER BY e.paterno, e.materno, e.nombre
+    `, [id]);
 
+    console.log(`📊 ${inscripciones.rows.length} estudiantes encontrados`);
+
+    // Para cada estudiante, calcular calificaciones
+    const estudiantesConCalificaciones = await Promise.all(
+      inscripciones.rows.map(async (est) => {
+        try {
+          // Calcular puntos de evaluaciones
+          let puntosEvaluaciones = 0;
+          try {
+            const evalResult = await pool.query(`
+              SELECT SUM(r.nota_obtenida) as total_puntos
+              FROM public.respuesta r
+              JOIN public.preguntas p ON r.numero_preg = p.numero_preg
+              JOIN public.evaluaciones ev ON p.id_evaluacion = ev.id_evaluacion
+              WHERE r.id_inscripcion = $1 
+              AND ev.id_tutoria = $2
+              AND r.activo = TRUE
+            `, [est.id_inscripcion, id]);
+            
+            puntosEvaluaciones = parseFloat(evalResult.rows[0]?.total_puntos) || 0;
+          } catch (evalError) {
+            console.warn(`⚠️ Error calculando evaluaciones:`, evalError.message);
+            puntosEvaluaciones = 0;
+          }
+
+          // Calcular total de actividades
+          let totalActividades = 0;
+          try {
+            const actResult = await pool.query(`
+              SELECT COUNT(*) as total
+              FROM public.actividad 
+              WHERE id_tutoria = $1 
+              AND activo = TRUE
+            `, [id]);
+            
+            totalActividades = parseInt(actResult.rows[0]?.total) || 0;
+          } catch (actError) {
+            console.warn(`⚠️ Error contando actividades:`, actError.message);
+            totalActividades = 0;
+          }
+
+          // Calcular actividades completadas usando entrega_tarea
+          let actividadesCompletadas = 0;
+          let puntosActividades = 0;
+          try {
+            const entregaResult = await pool.query(`
+              SELECT 
+                COUNT(*) as completadas,
+                COALESCE(SUM(et.calificacion), 0) as total_puntos
+              FROM public.entrega_tarea et
+              JOIN public.actividad act ON et.id_actividad = act.id_actividad
+              WHERE et.id_estudiante = $1 
+              AND act.id_tutoria = $2
+              AND et.activo = TRUE
+              AND et.estado = 'calificado'  -- Solo las calificadas
+            `, [est.id_estudiante, id]);
+            
+            actividadesCompletadas = parseInt(entregaResult.rows[0]?.completadas) || 0;
+            puntosActividades = parseFloat(entregaResult.rows[0]?.total_puntos) || 0;
+          } catch (entregaError) {
+            console.warn(`⚠️ Error calculando entregas:`, entregaError.message);
+            actividadesCompletadas = 0;
+            puntosActividades = 0;
+          }
+
+          // Calcular calificación acumulada
+          const puntosTotales = puntosEvaluaciones + puntosActividades;
+          const calificacionAcumulada = Math.min(puntosTotales, 100);
+
+          return {
+            ...est,
+            calificacion_acumulada: calificacionAcumulada,
+            puntos_evaluaciones: puntosEvaluaciones,
+            puntos_actividades: puntosActividades,
+            total_actividades: totalActividades,
+            actividades_completadas: actividadesCompletadas
+            // estado_pago y fecha_de_pago ya vienen de la consulta principal
+          };
+        } catch (error) {
+          console.error(`❌ Error procesando estudiante ${est.id_inscripcion}:`, error);
+          return {
+            ...est,
+            calificacion_acumulada: 0,
+            puntos_evaluaciones: 0,
+            puntos_actividades: 0,
+            total_actividades: 0,
+            actividades_completadas: 0
+          };
+        }
+      })
+    );
+
+    console.log(`✅ Estudiantes procesados: ${estudiantesConCalificaciones.length}`);
+    res.json(estudiantesConCalificaciones);
+
+  } catch (error) {
+    console.error("❌ Error crítico al obtener estudiantes completos:", error);
+    res.status(500).json({ 
+      error: "Error interno del servidor",
+      detalle: error.message
+    });
+  }
+});
 export default router;

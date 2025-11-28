@@ -438,4 +438,33 @@ router.get("/tutor/mi-info", async (req, res) => {
     res.status(500).json({ error: "Error al obtener información del tutor" });
   }
 });
+// GET - Perfil del tutor por token (RECOMENDADO)
+router.get("/mi-perfil", verificarToken, async (req, res) => {
+  try {
+    console.log("📋 Obteniendo perfil del tutor para usuario:", req.user.id_usuario);
+    
+    // Verificar que el usuario es un tutor
+    if (req.user.id_rol !== 3) {
+      return res.status(403).json({ error: "Solo los tutores pueden acceder a esta información" });
+    }
+
+    const result = await pool.query(
+      `SELECT t.*, u.nombre as usuario_nombre, u.email
+       FROM public.tutor t
+       JOIN public.usuario u ON t.id_usuario = u.id_usuario
+       WHERE t.id_usuario = $1 AND t.activo = TRUE`,
+      [req.user.id_usuario]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Tutor no encontrado" });
+    }
+
+    console.log("✅ Perfil del tutor encontrado:", result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al obtener perfil del tutor:", error.message);
+    res.status(500).json({ error: "Error al obtener perfil del tutor: " + error.message });
+  }
+});
 export default router;

@@ -111,28 +111,57 @@ router.get("/actividad/:id_actividad", async (req, res) => {
 });
 
 // POST - Crear entrega - VERSIÓN CORREGIDA
+// POST - Crear entrega - VERSIÓN MEJORADA
 router.post("/", async (req, res) => {
   try {
     const { id_actividad, id_estudiante, url_drive } = req.body;
     
-    if (!id_actividad || !id_estudiante || !url_drive) {
-      return res.status(400).json({ error: "Todos los campos son requeridos" });
+    console.log("📦 Datos recibidos para entrega:", { id_actividad, id_estudiante, url_drive });
+    
+    if (!id_actividad) {
+      return res.status(400).json({ error: "El ID de actividad es requerido" });
+    }
+    if (!id_estudiante) {
+      return res.status(400).json({ error: "El ID de estudiante es requerido" });
+    }
+    if (!url_drive) {
+      return res.status(400).json({ error: "La URL de Drive es requerida" });
     }
     
-    // CORREGIR: Usar la tabla correcta entrega_tarea
+    // Verificar que la actividad existe
+    const actividadCheck = await pool.query(
+      "SELECT * FROM public.actividad WHERE id_actividad = $1 AND activo = TRUE",
+      [id_actividad]
+    );
+    
+    if (actividadCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Actividad no encontrada" });
+    }
+    
+    // Verificar que el estudiante existe
+    const estudianteCheck = await pool.query(
+      "SELECT * FROM public.estudiante WHERE id_estudiante = $1 AND activo = TRUE",
+      [id_estudiante]
+    );
+    
+    if (estudianteCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Estudiante no encontrado" });
+    }
+    
+    // Insertar la entrega
     const result = await pool.query(
       `INSERT INTO public.entrega_tarea (id_actividad, id_estudiante, url_drive, fecha_entrega, estado) 
        VALUES ($1, $2, $3, NOW(), 'pendiente') RETURNING *`,
       [id_actividad, id_estudiante, url_drive]
     );
     
+    console.log("✅ Entrega creada exitosamente:", result.rows[0]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error("Error al crear entrega:", error.message);
-    res.status(500).json({ error: "Error al crear entrega" });
+    res.status(500).json({ error: "Error al crear entrega: " + error.message });
   }
 });
-
 // PUT - Calificar entrega - VERSIÓN CORREGIDA
 router.put("/:id_entrega/calificar", async (req, res) => {
   try {
