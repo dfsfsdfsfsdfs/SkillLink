@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Preguntas from './Preguntas';
+import ResolverEvaluacion from './ResolverEvaluacion';
+import DetallesEvaluacion from './DetallesEvaluacion'; // ✅ AGREGAR ESTA IMPORTACIÓN
 
 // 🔥 MOVER el modal fuera del componente principal
 const EvaluacionModal = ({
@@ -105,7 +107,11 @@ const Evaluaciones = () => {
   const [editingEvaluacion, setEditingEvaluacion] = useState(null);
   const [evaluacionSeleccionada, setEvaluacionSeleccionada] = useState(null);
   const { getAuthToken, user } = useAuth();
-
+  const [resolviendoEvaluacion, setResolviendoEvaluacion] = useState(null);
+  const [inscripcionEstudiante, setInscripcionEstudiante] = useState(null);
+  const [cargandoInscripcion, setCargandoInscripcion] = useState(false);
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [mostrandoDetalles, setMostrandoDetalles] = useState(null);
   // 🔥 NUEVO: Estado para información de la tutoría
   const [tutoriaInfo, setTutoriaInfo] = useState(null);
 
@@ -114,7 +120,12 @@ const Evaluaciones = () => {
     descripcion: '',
     fecha_limite: ''
   });
-
+const opciones = [
+  { valor: 1, texto: 'A' },
+  { valor: 2, texto: 'B' },
+  { valor: 3, texto: 'C' },
+  { valor: 4, texto: 'D' }
+];
   const getToken = useCallback(() => {
     return getAuthToken ? getAuthToken() : localStorage.getItem('authToken');
   }, [getAuthToken]);
@@ -182,6 +193,21 @@ const Evaluaciones = () => {
       setLoading(false);
     }
   }, [getToken, id]);
+  const cargarEstudiantes = useCallback(async () => {
+  try {
+    const token = getToken();
+    const response = await fetch(`http://localhost:3000/inscripciones/tutoria/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.ok) {
+      const estudiantesData = await response.json();
+      setEstudiantes(estudiantesData);
+    }
+  } catch (err) {
+    console.error('Error cargando estudiantes:', err);
+  }
+}, [getToken, id]);
 
   // Crear evaluación - ACTUALIZADO con validación de permisos
   const crearEvaluacion = useCallback(async (formData) => {
@@ -288,6 +314,115 @@ const Evaluaciones = () => {
     }
   }, [getToken, cargarEvaluaciones, puedeGestionarEvaluaciones]);
 
+// Función para obtener la inscripción del estudiante - USANDO ENDPOINT EXISTENTE
+const obtenerInscripcionEstudiante = useCallback(async (tutoriaId) => {
+  try {
+    setCargandoInscripcion(true);
+    const token = getToken();
+    const response = await fetch(`http://localhost:3000/inscripciones/verificar-inscripcion/${tutoriaId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("📋 Datos de verificación:", data);
+      
+      if (data.inscrito && data.aprobado) {
+        // Si está inscrito y aprobado, necesitamos obtener el id_inscripcion
+        // Podemos obtenerlo de otra manera o modificar el endpoint
+        const inscripcionResponse = await fetch(`http://localhost:3000/inscripciones/tutoria/${tutoriaId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (inscripcionResponse.ok) {
+          const inscripciones = await inscripcionResponse.json();
+          // Buscar la inscripción del estudiante actual
+          const estudianteInscrito = inscripciones.find(ins => 
+            ins.email === user?.email // Asumiendo que el user tiene email
+          );
+          
+          if (estudianteInscrito) {
+            setInscripcionEstudiante(estudianteInscrito);
+            return estudianteInscrito;
+          }
+        }
+      }
+      
+      throw new Error(data.mensaje || 'No estás inscrito en esta tutoría');
+    } else {
+      throw new Error('Error al verificar inscripción');
+    }
+  } catch (err) {
+    console.error('Error obteniendo inscripción:', err);
+    setError(err.message);
+    return null;
+  } finally {
+    setCargandoInscripcion(false);
+  }
+}, [getToken, user]);
+
+const obtenerInscripcionDeLista = useCallback(() => {
+  if (!user || user.id_rol !== 4) return null;
+  
+  console.log("👤 Usuario actual:", user);
+  console.log("📋 Lista de estudiantes:", estudiantes);
+  
+  if (estudiantes.length === 0) {
+    console.log("⚠️ Lista de estudiantes vacía");
+    return null;
+  }
+  
+  // Buscar estudiante que coincida con el usuario actual
+  const estudianteInscrito = estudiantes.find(est => {
+    // Comparar por email o por id_estudiante si está en el user
+    const coincideEmail = est.email === user.email;
+    const coincideId = user.id_estudiante && est.id_estudiante === user.id_estudiante;
+    
+    console.log(`🔍 Comparando: ${est.email} vs ${user.email} -> ${coincideEmail}`);
+    console.log(`🔍 Comparando IDs: ${est.id_estudiante} vs ${user.id_estudiante} -> ${coincideId}`);
+    
+    return coincideEmail || coincideId;
+  });
+  
+  console.log("🎯 Estudiante inscrito encontrado:", estudianteInscrito);
+  
+  return estudianteInscrito || null;
+}, [estudiantes, user]);
+
+const abrirDetallesEvaluacion = useCallback((evaluacion) => {
+  setMostrandoDetalles(evaluacion);
+}, []);
+
+// Función para cerrar detalles
+const cerrarDetallesEvaluacion = useCallback(() => {
+  setMostrandoDetalles(null);
+}, []);
+
+// Función modificada para abrir resolver evaluación
+// Función modificada para abrir resolver evaluación
+const abrirResolverEvaluacion = useCallback((evaluacion) => {
+  if (cargandoInscripcion) return;
+  
+  console.log("🔄 Abriendo evaluación para resolver...");
+  
+  const estudianteInscrito = obtenerInscripcionDeLista();
+  
+  if (estudianteInscrito && estudianteInscrito.id_inscripcion) {
+    console.log("✅ Estudiante inscrito encontrado, ID:", estudianteInscrito.id_inscripcion);
+    setInscripcionEstudiante(estudianteInscrito);
+    setResolviendoEvaluacion(evaluacion);
+    setError(null);
+  } else {
+    const errorMsg = 'No estás inscrito en esta tutoría o no se encontró tu inscripción. Verifica que tu estado sea "inscrito".';
+    console.error("❌", errorMsg);
+    setError(errorMsg);
+  }
+}, [cargandoInscripcion, obtenerInscripcionDeLista]);
+
+    const cerrarResolverEvaluacion = useCallback(() => {
+      setResolviendoEvaluacion(null);
+    }, []);
+
   const resetForm = useCallback(() => {
     setFormData({
       nombre_evaluacion: '',
@@ -352,12 +487,17 @@ const Evaluaciones = () => {
     setEvaluacionSeleccionada(null);
   }, []);
 
-  useEffect(() => {
-    if (id) {
-      cargarTutoriaInfo(); // 🔥 Cargar información de la tutoría
-      cargarEvaluaciones();
+useEffect(() => {
+  if (id) {
+    cargarTutoriaInfo();
+    cargarEvaluaciones();
+    
+    // Si es estudiante, cargar la lista de estudiantes para buscar su inscripción
+    if (userRole === 4) {
+      cargarEstudiantes();
     }
-  }, [id, cargarEvaluaciones, cargarTutoriaInfo]);
+  }
+}, [id, cargarEvaluaciones, cargarTutoriaInfo, userRole, cargarEstudiantes]);
 
   if (loading) {
     return (
@@ -390,7 +530,58 @@ const Evaluaciones = () => {
       </div>
     );
   }
-
+  // Si hay una evaluación seleccionada para resolver, mostrar el componente
+// Si hay una evaluación seleccionada para resolver, mostrar el componente
+if (resolviendoEvaluacion) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center space-x-4 mb-6">
+        <button
+          onClick={cerrarResolverEvaluacion}
+          className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Volver a Evaluaciones</span>
+        </button>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Resolver: {resolviendoEvaluacion.nombre_evaluacion}
+        </h2>
+      </div>
+      
+      {inscripcionEstudiante ? (
+        <ResolverEvaluacion 
+          evaluacion={resolviendoEvaluacion}
+          inscripcionId={inscripcionEstudiante.id_inscripcion}
+          onFinalizar={cerrarResolverEvaluacion}
+        />
+      ) : (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 text-yellow-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <p className="text-yellow-800 dark:text-yellow-300">
+              Cargando información de tu inscripción...
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// Agrega esta condición antes del return principal
+if (mostrandoDetalles) {
+  return (
+    <div className="space-y-6">
+      <DetallesEvaluacion 
+        evaluacion={mostrandoDetalles}
+        onVolver={cerrarDetallesEvaluacion}
+      />
+    </div>
+  );
+}
   return (
     <div className="space-y-6">
       {/* Header y botón de crear - ACTUALIZADO con validación de permisos */}
@@ -495,12 +686,25 @@ const Evaluaciones = () => {
               </div>
               
               <div className="flex space-x-2">
-                <button 
-                  onClick={() => abrirGestionPreguntas(evaluacion)}
-                  className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Gestionar Preguntas
-                </button>
+                {/* Botón para gestionar preguntas (solo tutores/gerentes/admin) */}
+                {puedeGestionarEvaluaciones() && (
+                  <button 
+                    onClick={() => abrirGestionPreguntas(evaluacion)}
+                    className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Gestionar Preguntas
+                  </button>
+                )}
+                
+                {/* Botón para resolver evaluación (solo estudiantes) */}
+                {userRole === 4 && ( // 4 = Estudiante
+                  <button 
+                    onClick={() => abrirResolverEvaluacion(evaluacion)}
+                    className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Resolver Evaluación
+                  </button>
+                )}
                 
                 {/* 🔥 MOSTRAR BOTONES DE EDICIÓN/ELIMINACIÓN SOLO SI TIENE PERMISOS */}
                 {puedeGestionarEvaluaciones() && (
@@ -527,6 +731,15 @@ const Evaluaciones = () => {
                   </div>
                 )}
               </div>
+              {/* Botón para ver detalles (solo para docentes/administradores) */}
+              {(isAdmin || isGerente || isTutor) && (
+                <button 
+                  onClick={() => abrirDetallesEvaluacion(evaluacion)}
+                  className="flex-1 px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Ver Detalles
+                </button>
+              )}
             </div>
           ))}
         </div>

@@ -61,65 +61,54 @@ router.get("/verificar-inscripcion/:id_tutoria", async (req, res) => {
     const { id_tutoria } = req.params;
     const user = req.user;
 
+    console.log("🔍 DEBUG - Información completa del usuario:", user);
     console.log("🔍 Verificando inscripción para:", {
       usuario: user.email,
       usuario_id: user.id_usuario,
-      tutoria_id: id_tutoria
+      tutoria_id: id_tutoria,
+      // Agrega más campos para debug
+      id_rol: user.id_rol,
+      nombre: user.nombre
     });
 
-    // Buscar estudiante por email
+    // 🔥 CAMBIO TEMPORAL: Buscar por id_usuario en lugar de email
     const estudianteResult = await pool.query(
-      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
-      [user.email]
+      "SELECT id_estudiante, email FROM public.estudiante WHERE id_usuario = $1 AND activo = TRUE",
+      [user.id_usuario]
     );
 
     if (estudianteResult.rows.length === 0) {
+      console.log("❌ No se encontró estudiante para id_usuario:", user.id_usuario);
+      
+      // También intentar buscar por email como fallback
+      if (user.email) {
+        const estudianteResultByEmail = await pool.query(
+          "SELECT id_estudiante, email FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+          [user.email]
+        );
+        
+        if (estudianteResultByEmail.rows.length > 0) {
+          console.log("✅ Estudiante encontrado por email:", user.email);
+          const id_estudiante = estudianteResultByEmail.rows[0].id_estudiante;
+          return await verificarInscripcionEstudiante(id_estudiante, id_tutoria, res);
+        }
+      }
+      
       return res.json({
         inscrito: false,
         aprobado: false,
-        mensaje: "No se encontró perfil de estudiante"
+        mensaje: "No se encontró perfil de estudiante",
+        debug: {
+          id_usuario: user.id_usuario,
+          email: user.email
+        }
       });
     }
 
     const id_estudiante = estudianteResult.rows[0].id_estudiante;
-
-    // Verificar inscripción
-    const inscripcionResult = await pool.query(
-      `SELECT i.*, t.nombre_tutoria 
-       FROM public.inscripcion i
-       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
-       WHERE i.id_estudiante = $1 AND i.id_tutoria = $2 AND i.activo = TRUE
-       LIMIT 1`,
-      [id_estudiante, id_tutoria]
-    );
-
-    if (inscripcionResult.rows.length === 0) {
-      return res.json({
-        inscrito: false,
-        aprobado: false,
-        mensaje: "No estás inscrito en esta tutoría"
-      });
-    }
-
-    const inscripcion = inscripcionResult.rows[0];
+    console.log("✅ ID Estudiante encontrado:", id_estudiante, "Email:", estudianteResult.rows[0].email);
     
-    // Verificar si está aprobado (depende de tu lógica de negocio)
-    // Opción 1: Si usas estado_inscripcion
-    const aprobado = inscripcion.estado_inscripcion === 'aprobada' || 
-                     inscripcion.estado_inscripcion === 'activa' ||
-                     inscripcion.estado_inscripcion === 'inscrito';
-    
-    // Opción 2: Si usas estado_solicitud
-    // const aprobado = inscripcion.estado_solicitud === 'inscrito';
-
-    return res.json({
-      inscrito: true,
-      aprobado: aprobado,
-      estado: inscripcion.estado_inscripcion,
-      estado_solicitud: inscripcion.estado_solicitud,
-      fecha_inscripcion: inscripcion.fecha_inscripcion,
-      nombre_tutoria: inscripcion.nombre_tutoria
-    });
+    return await verificarInscripcionEstudiante(id_estudiante, id_tutoria, res);
 
   } catch (error) {
     console.error("Error al verificar inscripción:", error.message);
@@ -131,6 +120,56 @@ router.get("/verificar-inscripcion/:id_tutoria", async (req, res) => {
   }
 });
 
+// 🔥 NUEVA: Función separada para verificar la inscripción
+async function verificarInscripcionEstudiante(id_estudiante, id_tutoria, res) {
+  try {
+    // Verificar inscripción
+    const inscripcionResult = await pool.query(
+      `SELECT i.*, t.nombre_tutoria 
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+       WHERE i.id_estudiante = $1 AND i.id_tutoria = $2 AND i.activo = TRUE
+       LIMIT 1`,
+      [id_estudiante, id_tutoria]
+    );
+
+    if (inscripcionResult.rows.length === 0) {
+      console.log("❌ No hay inscripción activa para estudiante:", id_estudiante, "en tutoría:", id_tutoria);
+      return res.json({
+        inscrito: false,
+        aprobado: false,
+        mensaje: "No estás inscrito en esta tutoría"
+      });
+    }
+
+    const inscripcion = inscripcionResult.rows[0];
+    console.log("📋 Inscripción encontrada:", {
+      id_inscripcion: inscripcion.id_inscripcion,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion
+    });
+    
+    // Verificar si está inscrito según estado_solicitud (la columna correcta)
+    const inscrito = inscripcion.estado_solicitud === 'inscrito';
+    const aprobado = inscripcion.estado_inscripcion === 'aprobada' || 
+                     inscripcion.estado_inscripcion === 'activa';
+
+    console.log("✅ Resultado final - Inscrito:", inscrito, "Aprobado:", aprobado);
+
+    return res.json({
+      inscrito: inscrito,
+      aprobado: aprobado,
+      estado: inscripcion.estado_inscripcion,
+      estado_solicitud: inscripcion.estado_solicitud,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      nombre_tutoria: inscripcion.nombre_tutoria
+    });
+
+  } catch (error) {
+    console.error("Error en verificarInscripcionEstudiante:", error.message);
+    throw error;
+  }
+}
 // GET - Inscripción por ID (solo si está activa) - CON VERIFICACIÓN DE PERMISOS
 router.get("/:id", async (req, res) => {
   try {
@@ -299,6 +338,179 @@ router.get("/tutoria/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener inscripciones de la tutoría" });
   }
 });
+
+// routes/inscripciones.js - Agregar este endpoint si no existe
+
+// GET - Inscripciones por tutoría (solo activas y aprobadas)
+// GET - Obtener inscripciones del estudiante autenticado
+router.get("/mis-inscripciones", async (req, res) => {
+  try {
+    console.log('📚 Obteniendo inscripciones del estudiante...', req.user);
+    
+    // Solo estudiantes pueden acceder
+    if (req.user.id_rol !== 4) {
+      return res.status(403).json({ 
+        error: "Solo los estudiantes pueden acceder a esta información" 
+      });
+    }
+
+    // Buscar el ID del estudiante por email
+    const estudianteResult = await pool.query(
+      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+      [req.user.email]
+    );
+
+    if (estudianteResult.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "No se encontró perfil de estudiante para este usuario" 
+      });
+    }
+
+    const id_estudiante = estudianteResult.rows[0].id_estudiante;
+    console.log('🎓 ID Estudiante encontrado:', id_estudiante);
+
+    // Obtener todas las inscripciones del estudiante
+    const result = await pool.query(
+      `SELECT 
+        i.*,
+        t.nombre_tutoria,
+        t.sigla,
+        t.descripcion_tutoria,
+        t.cupo,
+        tu.nombre as tutor_nombre,
+        tu.especialidad,
+        inst.nombre as institucion_nombre,
+        p.nro_pago,
+        p.monto,
+        p.estado_pago,
+        p.fecha_de_pago,
+        (
+          SELECT COUNT(*) 
+          FROM public.inscripcion ins 
+          WHERE ins.id_tutoria = i.id_tutoria 
+          AND ins.estado_solicitud = 'inscrito' 
+          AND ins.activo = TRUE
+        ) as inscritos_actuales,
+        t.cupo - (
+          SELECT COUNT(*) 
+          FROM public.inscripcion ins 
+          WHERE ins.id_tutoria = i.id_tutoria 
+          AND ins.estado_solicitud = 'inscrito' 
+          AND ins.activo = TRUE
+        ) as cupos_disponibles
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria AND t.activo = TRUE
+       JOIN public.tutor tu ON t.id_tutor = tu.id_tutor AND tu.activo = TRUE
+       JOIN public.institucion inst ON t.id_institucion = inst.id_institucion
+       LEFT JOIN public.pago_qr p ON i.id_inscripcion = p.id_inscripcion AND p.activo = TRUE
+       WHERE i.id_estudiante = $1 AND i.activo = TRUE
+       ORDER BY i.fecha_inscripcion DESC`,
+      [id_estudiante]
+    );
+
+    console.log(`✅ ${result.rows.length} inscripciones encontradas`);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error("❌ Error al obtener inscripciones:", error.message);
+    res.status(500).json({ 
+      error: "Error al obtener inscripciones",
+      detalle: error.message 
+    });
+  }
+});
+
+// GET - Verificar si el estudiante actual está inscrito en una tutoría específica
+router.get("/verificar-estudiante/tutoria/:id_tutoria", async (req, res) => {
+  try {
+    const { id_tutoria } = req.params;
+    const user = req.user;
+
+    console.log('🔍 Verificando inscripción para:', {
+      usuario: user.email,
+      id_tutoria: id_tutoria,
+      rol: user.id_rol
+    });
+
+    // Solo estudiantes pueden usar este endpoint
+    if (user.id_rol !== 4) {
+      return res.status(403).json({ 
+        error: "Solo los estudiantes pueden usar este endpoint",
+        inscrito: false 
+      });
+    }
+
+    // Buscar al estudiante por email del usuario
+    const estudianteResult = await pool.query(
+      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+      [user.email]
+    );
+
+    if (estudianteResult.rows.length === 0) {
+      console.log('❌ Estudiante no encontrado para email:', user.email);
+      return res.status(404).json({ 
+        error: "Estudiante no encontrado",
+        inscrito: false 
+      });
+    }
+
+    const id_estudiante = estudianteResult.rows[0].id_estudiante;
+    console.log('🎓 ID Estudiante encontrado:', id_estudiante);
+
+    // Verificar inscripción en la tutoría
+    const inscripcionResult = await pool.query(
+      `SELECT i.*, t.nombre_tutoria, t.sigla,
+              CASE 
+                WHEN i.estado_solicitud = 'inscrito' THEN true
+                ELSE false
+              END as esta_inscrito
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+       WHERE i.id_estudiante = $1 
+         AND i.id_tutoria = $2 
+         AND i.activo = TRUE
+       ORDER BY i.fecha_inscripcion DESC
+       LIMIT 1`,
+      [id_estudiante, id_tutoria]
+    );
+
+    if (inscripcionResult.rows.length === 0) {
+      console.log('❌ No hay inscripción activa encontrada');
+      return res.json({ 
+        inscrito: false,
+        mensaje: "No estás inscrito en esta tutoría"
+      });
+    }
+
+    const inscripcion = inscripcionResult.rows[0];
+    const estaInscrito = inscripcion.esta_inscrito;
+    
+    console.log('✅ Estado de inscripción:', {
+      inscrito: estaInscrito,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion
+    });
+
+    res.json({
+      inscrito: estaInscrito,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      tutoria: {
+        nombre: inscripcion.nombre_tutoria,
+        sigla: inscripcion.sigla
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error al verificar inscripción:", error.message);
+    res.status(500).json({ 
+      error: "Error al verificar inscripción",
+      inscrito: false 
+    });
+  }
+});
+
 
 // 🔥 NUEVO: PUT - Activar inscripción (cuando el pago está verificado)
 router.put("/:id/activar", async (req, res) => {
@@ -1326,6 +1538,125 @@ router.get("/tutoria/:id/completo", async (req, res) => {
     res.status(500).json({ 
       error: "Error interno del servidor",
       detalle: error.message
+    });
+  }
+});
+
+// GET - Obtener inscripción del estudiante actual para una tutoría específica
+router.get("/estudiante-actual/tutoria/:idTutoria", async (req, res) => {
+  try {
+    const { idTutoria } = req.params;
+    
+    // Asumiendo que tienes el ID del estudiante en el token JWT
+    // O necesitas enviarlo desde el frontend
+    const idEstudiante = req.user.id_estudiante; // O como lo tengas en tu token
+    
+    const result = await pool.query(
+      `SELECT i.*, e.nombre, e.paterno, e.materno, e.email
+       FROM public.inscripcion i
+       JOIN public.estudiante e ON i.id_estudiante = e.id_estudiante
+       WHERE i.id_tutoria = $1 AND i.id_estudiante = $2 AND i.activo = TRUE
+       AND i.estado_solicitud = 'inscrito'`,
+      [idTutoria, idEstudiante]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No estás inscrito en esta tutoría o tu inscripción no está activa" });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error al obtener inscripción del estudiante:", error.message);
+    res.status(500).json({ error: "Error al obtener inscripción" });
+  }
+});
+// GET - Verificar si el estudiante actual está inscrito en una tutoría específica
+router.get("/verificar-estudiante/tutoria/:id_tutoria", async (req, res) => {
+  try {
+    const { id_tutoria } = req.params;
+    const user = req.user;
+
+    console.log('🔍 Verificando inscripción para:', {
+      usuario: user.email,
+      id_tutoria: id_tutoria,
+      rol: user.id_rol
+    });
+
+    // Solo estudiantes pueden usar este endpoint
+    if (user.id_rol !== 4) {
+      return res.status(403).json({ 
+        error: "Solo los estudiantes pueden usar este endpoint",
+        inscrito: false 
+      });
+    }
+
+    // Buscar al estudiante por email del usuario
+    const estudianteResult = await pool.query(
+      "SELECT id_estudiante FROM public.estudiante WHERE email = $1 AND activo = TRUE",
+      [user.email]
+    );
+
+    if (estudianteResult.rows.length === 0) {
+      console.log('❌ Estudiante no encontrado para email:', user.email);
+      return res.status(404).json({ 
+        error: "Estudiante no encontrado",
+        inscrito: false 
+      });
+    }
+
+    const id_estudiante = estudianteResult.rows[0].id_estudiante;
+    console.log('🎓 ID Estudiante encontrado:', id_estudiante);
+
+    // Verificar inscripción en la tutoría
+    const inscripcionResult = await pool.query(
+      `SELECT i.*, t.nombre_tutoria, t.sigla,
+              CASE 
+                WHEN i.estado_solicitud = 'inscrito' THEN true
+                ELSE false
+              END as esta_inscrito
+       FROM public.inscripcion i
+       JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+       WHERE i.id_estudiante = $1 
+         AND i.id_tutoria = $2 
+         AND i.activo = TRUE
+       ORDER BY i.fecha_inscripcion DESC
+       LIMIT 1`,
+      [id_estudiante, id_tutoria]
+    );
+
+    if (inscripcionResult.rows.length === 0) {
+      console.log('❌ No hay inscripción activa encontrada');
+      return res.json({ 
+        inscrito: false,
+        mensaje: "No estás inscrito en esta tutoría"
+      });
+    }
+
+    const inscripcion = inscripcionResult.rows[0];
+    const estaInscrito = inscripcion.esta_inscrito;
+    
+    console.log('✅ Estado de inscripción:', {
+      inscrito: estaInscrito,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion
+    });
+
+    res.json({
+      inscrito: estaInscrito,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      tutoria: {
+        nombre: inscripcion.nombre_tutoria,
+        sigla: inscripcion.sigla
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error al verificar inscripción:", error.message);
+    res.status(500).json({ 
+      error: "Error al verificar inscripción",
+      inscrito: false 
     });
   }
 });

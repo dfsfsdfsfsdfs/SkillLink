@@ -23,11 +23,25 @@ import aprobacionRoutes from "./src/routes/aprobacionRoutes.js";
 import inscripcionesEstudianteRoutes from "./src/routes/InscripcionesEstudiante.js";
 import evaluacionesRouter from "./src/routes/evaluaciones.js";
 import entregasRouter from './src/routes/entregasTareas.js';
+
 dotenv.config();
 
 const app = express();
+
+// 🔥 SOLUCIÓN: Aumentar límites de tamaño para JSON y URL encoded
+app.use(express.json({ 
+  limit: '50mb', // Aumentar de 100kb por defecto a 50MB
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb' // Aumentar límite para datos URL encoded
+}));
+
 app.use(cors());
-app.use(express.json());
 
 app.get("/", (req, res) => {
   res.json({ 
@@ -49,6 +63,10 @@ app.get("/", (req, res) => {
       preguntas: "/preguntas",
       opciones: "/opciones",
       respuestas: "/respuestas"
+    },
+    configuracion: {
+      limite_json: "50MB",
+      limite_urlencoded: "50MB"
     }
   });
 });
@@ -74,6 +92,19 @@ app.use('/inscripciones-estudiante', inscripcionesEstudianteRoutes);
 app.use("/evaluaciones", evaluacionesRouter);
 app.use('/entregas', entregasRouter);
 
+// Middleware para manejar errores de Payload Too Large
+app.use((error, req, res, next) => {
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: "Payload Too Large",
+      mensaje: "El archivo o datos enviados son demasiado grandes",
+      limite: "50MB",
+      recomendacion: "Reduzca el tamaño de la imagen o use compresión"
+    });
+  }
+  next(error);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
@@ -94,5 +125,7 @@ app.listen(PORT, () => {
   console.log(`   POST http://localhost:${PORT}/usuarios (Registro)`);
   console.log(`   GET  http://localhost:${PORT}/usuarios/pendientes`);
   console.log(`   PUT  http://localhost:${PORT}/usuarios/:id/aprobar`);
-  
+  console.log(`⚙️  Configuración:`);
+  console.log(`   Límite JSON: 50MB`);
+  console.log(`   Límite URL Encoded: 50MB`);
 });

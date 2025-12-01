@@ -188,14 +188,13 @@ router.delete("/:id", async (req, res) => {
 });
 
 // POST - Responder evaluación y calcular calificación
+// Backend completamente adaptado para números
 router.post("/:id/responder", async (req, res) => {
   try {
     const { id_inscripcion, respuestas } = req.body;
     const evaluacionId = req.params.id;
 
-    console.log(`Procesando respuestas para evaluación ${evaluacionId}, inscripción ${id_inscripcion}`);
-
-    // Verificar que la evaluación existe
+    // Verificaciones
     const evaluacion = await pool.query(
       'SELECT * FROM public.evaluaciones WHERE id_evaluacion = $1 AND activo = TRUE',
       [evaluacionId]
@@ -205,7 +204,6 @@ router.post("/:id/responder", async (req, res) => {
       return res.status(404).json({ error: 'Evaluación no encontrada' });
     }
 
-    // Verificar que la inscripción existe
     const inscripcion = await pool.query(
       'SELECT * FROM public.inscripcion WHERE id_inscripcion = $1',
       [id_inscripcion]
@@ -218,34 +216,55 @@ router.post("/:id/responder", async (req, res) => {
     let calificacionFinal = 0;
     const resultados = [];
 
-    // Procesar cada respuesta
+    // Procesar cada respuesta - COMPLETAMENTE ADAPTADO PARA NÚMEROS
     for (const respuesta of respuestas) {
-      // Obtener la pregunta con la respuesta correcta
+      // Obtener la pregunta
       const pregunta = await pool.query(`
-        SELECT p.*, o.inciso as correcto_inciso
+        SELECT p.* 
         FROM public.preguntas p
-        LEFT JOIN public.opcion o ON p.inciso_correcto = o.inciso AND p.numero_preg = o.numero_preg
-        WHERE p.numero_preg = $1 AND p.activo = true
-      `, [respuesta.numero_preg]);
+        WHERE p.numero_preg = $1 AND p.id_evaluacion = $2 AND p.activo = true
+      `, [respuesta.numero_preg, evaluacionId]);
 
       if (pregunta.rows.length > 0) {
         const preg = pregunta.rows[0];
-        const esCorrecta = preg.correcto_inciso === respuesta.inciso_seleccionado;
+        
+        // ADAPTACIÓN: Si inciso_correcto es texto (A,B,C) y tenemos números
+        // Convertir letras a números: A=1, B=2, C=3, D=4
+        const mapeoLetraANumero = {
+          'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5,
+          'F': 6, 'G': 7, 'H': 8, 'I': 9, 'J': 10,
+          'K': 11, 'L': 12, 'M': 13, 'N': 14, 'O': 15,
+          'P': 16, 'Q': 17, 'R': 18, 'S': 19, 'T': 20,
+          'U': 21, 'V': 22, 'W': 23, 'X': 24, 'Y': 25, 'Z': 26
+        };
+        
+        // Convertir inciso_correcto (letra) a número
+        const incisoCorrectoNumero = mapeoLetraANumero[preg.inciso_correcto];
+        
+        // inciso_seleccionado viene del frontend como número
+        const incisoSeleccionadoNumero = parseInt(respuesta.inciso_seleccionado);
+        
+        const esCorrecta = incisoCorrectoNumero === incisoSeleccionadoNumero;
         const notaObtenida = esCorrecta ? (preg.nota_pregunta || 1) : 0;
 
-        // Guardar respuesta
+        // Guardar respuesta - ADAPTADO para tu estructura
         await pool.query(`
           INSERT INTO public.respuesta (
-            id_inscripcion, numero_preg, inciso_seleccionado, 
-            nota_obtenida, es_correcta, activo
-          ) VALUES ($1, $2, $3, $4, $5, TRUE)
-        `, [id_inscripcion, respuesta.numero_preg, respuesta.inciso_seleccionado, notaObtenida, esCorrecta]);
+            id_inscripcion, opcion_respuestas, descripcion, activo
+          ) VALUES ($1, $2, $3, TRUE)
+        `, [
+          id_inscripcion, 
+          respuesta.inciso_seleccionado.toString(), // Convertir a texto para guardar
+          `Pregunta ${respuesta.numero_preg}. ${esCorrecta ? 'Correcta' : 'Incorrecta'}. Seleccionado: ${respuesta.inciso_seleccionado}, Correcto: ${preg.inciso_correcto}`
+        ]);
 
         calificacionFinal += notaObtenida;
         resultados.push({
           pregunta: respuesta.numero_preg,
           esCorrecta,
-          notaObtenida
+          notaObtenida,
+          seleccionado: respuesta.inciso_seleccionado,
+          correcto: preg.inciso_correcto
         });
       }
     }
@@ -326,5 +345,49 @@ router.get("/:id/resultados/:id_inscripcion", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+// Agregar este endpoint al backend de evaluaciones
+router.post("/:id/calificar-desarrollo", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { id_inscripcion, calificaciones } = req.body;
 
+    // Verificar que la evaluación existe
+    const evaluacion = await pool.query(
+      'SELECT * FROM public.evaluaciones WHERE id_evaluacion = $1 AND activo = TRUE',
+      [id]
+    );
+
+    if (evaluacion.rows.length === 0) {
+      return res.status(404).json({ error: 'Evaluación no encontrada' });
+    }
+
+    let calificacionFinal = 0;
+
+    // Procesar cada calificación de pregunta de desarrollo
+    for (const calificacion of calificaciones) {
+      // Actualizar la nota obtenida en la respuesta
+      await pool.query(`
+        UPDATE public.respuesta 
+        SET nota_obtenida = $1, es_correcta = $2
+        WHERE id_inscripcion = $3 AND numero_preg = $4 
+      `, [
+        calificacion.nota_obtenida,
+        calificacion.nota_obtenida > 0,
+        id_inscripcion,
+        calificacion.numero_preg
+      ]);
+
+      calificacionFinal += calificacion.nota_obtenida;
+    }
+
+    res.json({
+      calificacion_final: calificacionFinal,
+      mensaje: 'Preguntas de desarrollo calificadas correctamente'
+    });
+
+  } catch (error) {
+    console.error('Error al calificar desarrollo:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 export default router;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 // Componente Badge reutilizable
@@ -25,8 +25,7 @@ const Badge = ({ children, color = "gray", size = "sm" }) => {
   );
 };
 
-// Modal para agregar/editar institución
-// Modal para agregar/editar institución
+// Modal para agregar/editar institución con funcionalidad de logo
 const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false, isGerente = false }) => {
   const [formData, setFormData] = useState({
     nombre: '',
@@ -34,15 +33,103 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
     telefono: '',
     tipo_institucion: '',
     horario_atencion: '',
-    id_usuario_gerente: ''
+    id_usuario_gerente: '',
+    logo_base64: ''
   });
   const [usuariosGerentes, setUsuariosGerentes] = useState([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [gerenteInfo, setGerenteInfo] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRef = useRef(null);
   const { getAuthToken, user } = useAuth();
 
   const getToken = () => {
     return getAuthToken ? getAuthToken() : localStorage.getItem('authToken');
+  };
+
+  // Función para obtener iniciales del nombre
+  const getIniciales = (nombre) => {
+    if (!nombre || typeof nombre !== 'string') return 'UN';
+    const palabras = nombre.split(' ').filter(word => word.trim() !== '');
+    let iniciales = '';
+    
+    if (palabras.length === 0) return 'UN';
+    
+    const palabrasSignificativas = palabras.filter(palabra => 
+      palabra.length > 2 && 
+      !['de', 'del', 'la', 'las', 'los', 'y', 'e', 'en', 'el'].includes(palabra.toLowerCase())
+    );
+    
+    if (palabrasSignificativas.length >= 2) {
+      iniciales = palabrasSignificativas[0].charAt(0) + palabrasSignificativas[1].charAt(0);
+    } else if (palabras.length >= 2) {
+      iniciales = palabras[0].charAt(0) + palabras[1].charAt(0);
+    } else {
+      iniciales = nombre.substring(0, 2);
+    }
+    
+    return iniciales.toUpperCase();
+  };
+
+  // Función para obtener color del logo
+  const getColorLogo = (nombre) => {
+    const colors = [
+      'bg-gradient-to-br from-blue-500 to-blue-600',
+      'bg-gradient-to-br from-green-500 to-green-600',
+      'bg-gradient-to-br from-purple-500 to-purple-600',
+      'bg-gradient-to-br from-red-500 to-red-600',
+      'bg-gradient-to-br from-yellow-500 to-yellow-600',
+      'bg-gradient-to-br from-indigo-500 to-indigo-600',
+      'bg-gradient-to-br from-pink-500 to-pink-600',
+      'bg-gradient-to-br from-teal-500 to-teal-600'
+    ];
+    
+    if (!nombre || typeof nombre !== 'string') return colors[0];
+    
+    let hash = 0;
+    for (let i = 0; i < nombre.length; i++) {
+      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    
+    return colors[index];
+  };
+
+  // Manejar subida de archivo
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Tipo de archivo no permitido. Solo se permiten imágenes JPEG, PNG, GIF y WebP.');
+      return;
+    }
+
+    // Validar tamaño (5MB máximo)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('El archivo es demasiado grande. El tamaño máximo permitido es 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target.result;
+      setFormData(prev => ({ ...prev, logo_base64: base64 }));
+      setPreviewImage(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Eliminar logo
+  const handleRemoveLogo = () => {
+    setFormData(prev => ({ ...prev, logo_base64: '' }));
+    setPreviewImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Cargar información del gerente actual
@@ -146,6 +233,7 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
   useEffect(() => {
     if (isOpen) {
       setGerenteInfo(null);
+      setPreviewImage(null);
       fetchUsuariosGerentes();
       
       if (isEdit && institucion) {
@@ -155,10 +243,14 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
           telefono: institucion.telefono || '',
           tipo_institucion: institucion.tipo_institucion || '',
           horario_atencion: institucion.horario_atencion || '',
-          id_usuario_gerente: institucion.id_usuario_gerente || ''
+          id_usuario_gerente: institucion.id_usuario_gerente || '',
+          logo_base64: institucion.logo_base64 || ''
         });
 
-        // Si es gerente, cargar su información
+        if (institucion.logo_base64) {
+          setPreviewImage(institucion.logo_base64);
+        }
+
         if (isGerente) {
           fetchGerenteInfo(institucion.id_usuario_gerente);
         }
@@ -169,7 +261,8 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
           telefono: '',
           tipo_institucion: '',
           horario_atencion: '',
-          id_usuario_gerente: ''
+          id_usuario_gerente: '',
+          logo_base64: ''
         });
       }
     }
@@ -223,6 +316,72 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Sección de Logo */}
+          <div className="text-center">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+              Logo de la Institución
+            </label>
+            
+            <div className="flex flex-col items-center space-y-4">
+              {/* Preview del Logo */}
+              <div className="relative">
+                {previewImage ? (
+                  <div className="relative">
+                    <img 
+                      src={previewImage} 
+                      alt="Logo preview" 
+                      className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`w-24 h-24 rounded-full ${getColorLogo(formData.nombre)} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
+                    {getIniciales(formData.nombre)}
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de subir archivo */}
+              <div className="flex flex-col space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <label
+                  htmlFor="logo-upload"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm text-center"
+                >
+                  {previewImage ? 'Cambiar Logo' : 'Subir Logo'}
+                </label>
+                
+                {previewImage && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    Eliminar Logo
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                Formatos: JPEG, PNG, GIF, WebP<br />
+                Tamaño máximo: 5MB
+              </p>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Nombre *
@@ -379,10 +538,15 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
             </button>
             <button
               type="submit"
-              disabled={(!isGerente && !formData.id_usuario_gerente) || loadingUsuarios}
-              className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={(!isGerente && !formData.id_usuario_gerente) || loadingUsuarios || uploadingLogo}
+              className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              {isEdit ? 'Actualizar' : 'Crear'}
+              {uploadingLogo && (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>
+                {isEdit ? 'Actualizar' : 'Crear'}
+              </span>
             </button>
           </div>
         </form>
@@ -390,6 +554,7 @@ const InstitucionModal = ({ isOpen, onClose, onSave, institucion, isEdit = false
     </div>
   );
 };
+
 const Instituciones = () => {
   const [instituciones, setInstituciones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -493,6 +658,71 @@ const Instituciones = () => {
     }
   };
 
+  // Activar/desactivar institución (solo admin)
+  const toggleInstitucionEstado = async (idInstitucion, estadoActual) => {
+    try {
+      setUpdating(idInstitucion);
+      const token = getToken();
+      const response = await fetch(`http://localhost:3000/instituciones/${idInstitucion}/estado`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ activo: !estadoActual })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cambiar estado');
+      }
+
+      const result = await response.json();
+      setInstituciones(prev => 
+        prev.map(inst => 
+          inst.id_institucion === idInstitucion 
+            ? { ...inst, activo: !estadoActual }
+            : inst
+        )
+      );
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // Eliminar institución (solo admin)
+  const eliminarInstitucion = async (idInstitucion) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta institución? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      setUpdating(idInstitucion);
+      const token = getToken();
+      const response = await fetch(`http://localhost:3000/instituciones/${idInstitucion}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al eliminar institución');
+      }
+
+      setInstituciones(prev => prev.filter(inst => inst.id_institucion !== idInstitucion));
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   // Función para verificar si el gerente puede editar esta institución
   const puedeEditarInstitucion = (institucion) => {
     if (isAdmin) return true;
@@ -529,7 +759,7 @@ const Instituciones = () => {
     fetchInstituciones();
   }, []);
 
-  // Funciones auxiliares (las que ya tenías)
+  // Funciones auxiliares
   const getIniciales = (nombre) => {
     if (!nombre || typeof nombre !== 'string') return 'UN';
     const palabras = nombre.split(' ').filter(word => word.trim() !== '');
@@ -591,7 +821,7 @@ const Instituciones = () => {
     return colors[tipo] || colors.default;
   };
 
-    // Calcular estadísticas
+  // Calcular estadísticas
   const estadisticas = {
     total: instituciones.length,
     activas: instituciones.filter(inst => inst.activo).length,
@@ -732,8 +962,18 @@ const Instituciones = () => {
               {/* Header con logo y nombre */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-start space-x-4">
-                  <div className={`flex-shrink-0 w-16 h-16 rounded-xl ${getColorLogo(institucion.nombre)} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
-                    {getIniciales(institucion.nombre)}
+                  <div className="flex-shrink-0">
+                    {institucion.logo_base64 ? (
+                      <img 
+                        src={institucion.logo_base64} 
+                        alt={`Logo ${institucion.nombre}`}
+                        className="w-16 h-16 rounded-xl object-cover shadow-lg border-2 border-white dark:border-gray-800"
+                      />
+                    ) : (
+                      <div className={`w-16 h-16 rounded-xl ${getColorLogo(institucion.nombre)} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                        {getIniciales(institucion.nombre)}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex-1 min-w-0">

@@ -17,7 +17,7 @@ const { Pool } = pg;
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
-  database: "skill_link_db",  // ← Forzar el nombre aquí
+  database: "Skill_Link_db",  // ← Forzar el nombre aquí
   password: process.env.DB_PASS,
   port: process.env.DB_PORT,
 });
