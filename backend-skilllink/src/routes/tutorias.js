@@ -609,5 +609,106 @@ router.get("/recursos/tutores", async (req, res) => {
     res.status(500).json({ error: "Error al obtener tutores" });
   }
 });
+// ✅ GET - Obtener tutorías en las que el estudiante está inscrito
+router.get("/estudiante/inscrito/:idEstudiante", async (req, res) => {
+  try {
+    const { idEstudiante } = req.params;
+    
+    const result = await pool.query(`
+      SELECT DISTINCT 
+        t.*,
+        i.nombre as institucion_nombre,
+        i.direccion as institucion_direccion,
+        CONCAT(tu.nombre, ' ', tu.apellido_paterno) as tutor_nombre,
+        tu.especialidad as tutor_especialidad,
+        ins.estado_solicitud,
+        ins.fecha_inscripcion,
+        (
+          SELECT COUNT(*) 
+          FROM public.inscripcion ins2 
+          WHERE ins2.id_tutoria = t.id_tutoria 
+          AND ins2.estado_solicitud = 'inscrito' 
+          AND ins2.activo = TRUE
+        ) as inscritos_actuales,
+        t.cupo - (
+          SELECT COUNT(*) 
+          FROM public.inscripcion ins2 
+          WHERE ins2.id_tutoria = t.id_tutoria 
+          AND ins2.estado_solicitud = 'inscrito' 
+          AND ins2.activo = TRUE
+        ) as cupos_disponibles
+      FROM public.tutoria t
+      JOIN public.institucion i ON t.id_institucion = i.id_institucion
+      JOIN public.tutor tu ON t.id_tutor = tu.id_tutor
+      JOIN public.inscripcion ins ON t.id_tutoria = ins.id_tutoria
+      WHERE ins.id_estudiante = $1 
+        AND ins.estado_solicitud = 'inscrito'
+        AND ins.activo = TRUE
+        AND t.activo = TRUE
+      ORDER BY t.nombre_tutoria
+    `, [idEstudiante]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error obteniendo tutorías del estudiante:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
 
+// ✅ GET - Verificar si un estudiante está inscrito en una tutoría específica
+router.get("/verificar-inscripcion/:idTutoria/:idEstudiante", async (req, res) => {
+  try {
+    const { idTutoria, idEstudiante } = req.params;
+    
+    console.log("🔍 Verificando inscripción:", { idTutoria, idEstudiante });
+    
+    const result = await pool.query(`
+      SELECT 
+        i.id_inscripcion,
+        i.estado_solicitud,
+        i.estado_inscripcion,
+        i.fecha_inscripcion,
+        t.nombre_tutoria,
+        t.sigla,
+        CASE 
+          WHEN i.estado_solicitud = 'inscrito' THEN true
+          ELSE false
+        END as esta_inscrito
+      FROM public.inscripcion i
+      JOIN public.tutoria t ON i.id_tutoria = t.id_tutoria
+      WHERE i.id_tutoria = $1 
+        AND i.id_estudiante = $2 
+        AND i.activo = TRUE
+      LIMIT 1
+    `, [idTutoria, idEstudiante]);
+
+    if (result.rows.length === 0) {
+      console.log("❌ No se encontró inscripción activa");
+      return res.json({ 
+        inscrito: false,
+        mensaje: "No estás inscrito en esta tutoría",
+        inscripcion: null
+      });
+    }
+
+    const inscripcion = result.rows[0];
+    console.log("✅ Inscripción encontrada:", inscripcion);
+    
+    res.json({ 
+      inscrito: inscripcion.esta_inscrito,
+      estado_solicitud: inscripcion.estado_solicitud,
+      estado_inscripcion: inscripcion.estado_inscripcion,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      nombre_tutoria: inscripcion.nombre_tutoria,
+      sigla: inscripcion.sigla,
+      inscripcion: inscripcion
+    });
+  } catch (error) {
+    console.error("Error verificando inscripción:", error.message);
+    res.status(500).json({ 
+      error: "Error interno del servidor",
+      inscrito: false
+    });
+  }
+});
 export default router;

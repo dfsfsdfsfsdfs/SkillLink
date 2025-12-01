@@ -159,6 +159,18 @@ const crearOpcionesParaPregunta = async (pregunta, tipoPregunta) => {
     return mezcladas;
   };
 
+  const actualizarRespuesta = (index, campo, valor) => {
+  setRespuestas(prev => ({
+    ...prev,
+    [index]: {
+      ...prev[index],
+      [campo]: valor
+    }
+  }));
+};
+
+  
+
 // FUNCIÓN COMPLETAMENTE CORREGIDA: Comparar respuestas
 const compararRespuestasConCorrectas = (preguntasArray, respuestasObj) => {
   const resultados = {};
@@ -502,16 +514,20 @@ const enviarRespuestas = async () => {
   };
 
   // Manejar cambio de respuesta para desarrollo
-  const handleCambioDesarrollo = (indexPregunta, texto) => {
-    setRespuestas(prev => ({
-      ...prev,
-      [indexPregunta]: {
-        ...prev[indexPregunta],
-        respuesta_desarrollo: texto,
-        inciso_seleccionado: null
-      }
-    }));
-  };
+const handleRespuestaDesarrollo = (pregunta, valor) => {
+  setRespuestas(prev => ({
+    ...prev,
+    [pregunta.numero_preg]: {
+      numero_preg: pregunta.numero_preg,
+      tipo: 'desarrollo',
+      respuesta_desarrollo: valor,
+      es_correcta: null,
+      nota_obtenida: 0,
+      necesita_revision: true
+    }
+  }));
+};
+
 
   // Contador de tiempo
   useEffect(() => {
@@ -709,12 +725,12 @@ const enviarRespuestas = async () => {
         
         <div className="relative">
           <textarea
-            value={respuesta?.respuesta_desarrollo || ''}
-            onChange={(e) => handleCambioDesarrollo(index, e.target.value)}
-            rows={8}
-            className="w-full px-6 py-5 border-2 border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-800 dark:text-white resize-vertical text-lg leading-relaxed transition-all"
-            placeholder="Escribe tu respuesta detallada aquí... ✍️"
+            className="w-full p-3 border rounded-lg"
+            placeholder="Escribe tu respuesta..."
+            value={respuestas[pregunta.numero_preg]?.respuesta_desarrollo || ""}
+            onChange={(e) => handleRespuestaDesarrollo(pregunta, e.target.value)}
           />
+
         </div>
         
         {/* Consejos para desarrollo */}

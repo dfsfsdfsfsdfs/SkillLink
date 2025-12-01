@@ -226,6 +226,69 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener inscripción" });
   }
 });
+// GET - Obtener tutorías en las que el estudiante está inscrito
+router.get("/estudiante/:id_estudiante/tutorias", async (req, res) => {
+  try {
+    const { id_estudiante } = req.params;
+    
+    const result = await pool.query(`
+      SELECT 
+        t.*,
+        i.nombre as institucion_nombre,
+        tu.nombre || ' ' || tu.apellido_paterno || ' ' || COALESCE(tu.apellido_materno, '') as tutor_nombre,
+        tu.email as tutor_email,
+        ins.estado_solicitud,
+        ins.fecha_inscripcion,
+        COUNT(*) OVER() as total_inscritas
+      FROM public.inscripcion ins
+      JOIN public.tutoria t ON ins.id_tutoria = t.id_tutoria
+      JOIN public.institucion i ON t.id_institucion = i.id_institucion
+      JOIN public.tutor tu ON t.id_tutor = tu.id_tutor
+      WHERE ins.id_estudiante = $1
+        AND ins.estado_solicitud = 'inscrito'
+        AND t.activo = TRUE
+      ORDER BY ins.fecha_inscripcion DESC
+    `, [id_estudiante]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener tutorías del estudiante:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// GET - Verificar si un estudiante está inscrito en una tutoría específica
+router.get("/verificar/:id_tutoria/estudiante/:id_estudiante", async (req, res) => {
+  try {
+    const { id_tutoria, id_estudiante } = req.params;
+    
+    const result = await pool.query(`
+      SELECT 
+        id_inscripcion,
+        estado_solicitud,
+        fecha_inscripcion
+      FROM public.inscripcion
+      WHERE id_tutoria = $1 
+        AND id_estudiante = $2
+        AND estado_solicitud = 'inscrito'
+      LIMIT 1
+    `, [id_tutoria, id_estudiante]);
+
+    if (result.rows.length > 0) {
+      res.json({ 
+        inscrito: true, 
+        inscripcion: result.rows[0] 
+      });
+    } else {
+      res.json({ 
+        inscrito: false 
+      });
+    }
+  } catch (error) {
+    console.error("Error al verificar inscripción:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
 
 // GET - Inscripciones por estudiante (solo activas) - CON VERIFICACIÓN DE PERMISOS
 router.get("/estudiante/:id", async (req, res) => {

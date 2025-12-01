@@ -324,5 +324,30 @@ router.get("/:id/inscripciones", async (req, res) => {
     res.status(500).json({ error: "Error al obtener inscripciones del estudiante" });
   }
 });
+// GET - Obtener estudiante por ID de usuario
+router.get("/por-usuario/:idUsuario", async (req, res) => {
+  try {
+    const { idUsuario } = req.params;
+    
+    console.log("🔍 Buscando estudiante por id_usuario:", idUsuario);
+    
+    const result = await pool.query(
+      "SELECT * FROM public.estudiante WHERE id_usuario = $1 AND activo = TRUE",
+      [idUsuario]
+    );
+    
+    if (result.rows.length === 0) {
+      console.log("❌ Estudiante no encontrado para id_usuario:", idUsuario);
+      return res.status(404).json({ error: "Estudiante no encontrado" });
+    }
+    
+    console.log("✅ Estudiante encontrado:", result.rows[0].id_estudiante);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error obteniendo estudiante por id_usuario:", error.message);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 
 export default router;

@@ -27,6 +27,82 @@ const Badge = ({ children, color = "gray", size = "sm" }) => {
   );
 };
 
+const MenuEstudiante = ({ filtroVista, setFiltroVista, estadisticasEstudiante }) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-6 shadow-lg">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Mis Cursos y Tutorías
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gestiona tus inscripciones y explora nuevas tutorías
+          </p>
+        </div>
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+          <button
+            onClick={() => setFiltroVista('mis-cursos')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              filtroVista === 'mis-cursos'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Mis Cursos ({estadisticasEstudiante.misCursos || 0})
+          </button>
+          <button
+            onClick={() => setFiltroVista('todas')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              filtroVista === 'todas'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Todas las Tutorías
+          </button>
+        </div>
+      </div>
+      
+      {/* Stats para estudiante */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+            {estadisticasEstudiante.misCursos || 0}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Cursos Inscritos
+          </div>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+            {estadisticasEstudiante.cursosActivos || 0}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Cursos Activos
+          </div>
+        </div>
+        <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+          <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+            {estadisticasEstudiante.porCompletar || 0}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Por Completar
+          </div>
+        </div>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3">
+          <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
+            {estadisticasEstudiante.cuposTomados || 0}/{estadisticasEstudiante.cuposTotales || 0}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Cupos Usados
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // Modal para agregar/editar tutoría - MODIFICADO para tutores
 const TutoriaModal = ({ isOpen, onClose, onSave, tutoria, isEdit = false, esTutor = false }) => {
   const [formData, setFormData] = useState({
@@ -505,6 +581,17 @@ const Tutoria = () => {
   const [detallesOpen, setDetallesOpen] = useState(false);
   const [tutoriaSeleccionada, setTutoriaSeleccionada] = useState(null);
   const [editingTutoria, setEditingTutoria] = useState(null);
+
+  // Dentro del componente Tutoria, agrega estos estados:
+  const [tutoriasInscritas, setTutoriasInscritas] = useState([]);
+  const [estadoInscripciones, setEstadoInscripciones] = useState({}); // {idTutoria: true/false}
+  const [estadisticasEstudiante, setEstadisticasEstudiante] = useState({
+    misCursos: 0,
+    cursosActivos: 0,
+    porCompletar: 0,
+    cuposTomados: 0,
+    cuposTotales: 0
+  });
   
   // NUEVO: Estados para la inscripción
   const [mostrarInscripcion, setMostrarInscripcion] = useState(false);
@@ -523,6 +610,7 @@ const Tutoria = () => {
   const isAdmin = user?.id_rol === 1;
   const isGerente = user?.id_rol === 2;
   const isTutor = user?.id_rol === 3;
+  const isEstudiante = user?.id_rol === 4;
   const puedeGestionar = isAdmin || isGerente;
   const esTutor = isTutor;
 
@@ -554,6 +642,49 @@ const obtenerIdTutorUsuario = async () => {
     return null;
   }
 };
+// Función para obtener el ID del estudiante
+// Función para obtener el ID del estudiante - CORREGIDA
+const obtenerIdEstudiante = async () => {
+  if (!isEstudiante) return null;
+  
+  try {
+    const token = getToken();
+    console.log("🔍 Obteniendo ID de estudiante para usuario:", user.id_usuario);
+    
+    // Usar el nuevo endpoint para obtener estudiante por id_usuario
+    const response = await fetch(`http://localhost:3000/estudiantes/por-usuario/${user.id_usuario}`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const estudianteData = await response.json();
+      console.log("🎓 Estudiante encontrado:", estudianteData);
+      return estudianteData.id_estudiante;
+    } else {
+      // Fallback: buscar por email
+      console.log("⚠️ Intentando fallback por email...");
+      const response2 = await fetch(`http://localhost:3000/estudiantes/por-email/${encodeURIComponent(user.email || '')}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response2.ok) {
+        const estudianteData = await response2.json();
+        console.log("🎓 Estudiante encontrado por email:", estudianteData);
+        return estudianteData.id_estudiante;
+      }
+    }
+    
+    console.log("❌ No se pudo obtener ID de estudiante");
+    return null;
+  } catch (error) {
+    console.error('Error obteniendo ID estudiante:', error);
+    return null;
+  }
+};
+
 // Función para verificar si el tutor puede editar esta tutoría
 const tutorPuedeEditar = (tutoria) => {
   return esTutor && tutoria.tutor_id_usuario === user.id_usuario;
@@ -564,17 +695,34 @@ const esMiTutoria = (tutoria) => {
   return esTutor && tutoria.tutor_id_usuario === user.id_usuario;
 };
 
-  // Cargar tutorías
-// En el componente Tutoria, modifica la función fetchTutorias:
+// Modificar el fetchTutorias original para estudiantes
 const fetchTutorias = async (vista = filtroVista) => {
   try {
+    setLoading(true);
     const token = getToken();
-    const url = `http://localhost:3000/tutorias${vista ? `?vista=${vista}` : ''}`;
+    let url = 'http://localhost:3000/tutorias';
     
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+    if (isEstudiante) {
+      if (vista === 'mis-cursos') {
+        // Si es estudiante y quiere ver sus cursos, cargar las tutorías inscritas
+        await fetchTutoriasEstudiante();
+        // Usar las tutorías ya cargadas en tutoriasInscritas
+        setLoading(false);
+        return; // Salir, ya que se manejó en fetchTutoriasEstudiante
+      } else if (vista === 'disponibles') {
+        url += '?estado=activo&cupos=disponibles';
+      } else {
+        url += '?estado=activo';
       }
+    } else if (esTutor) {
+      url += vista ? `?vista=${vista}` : '';
+    } else {
+      url += vista ? `?vista=${vista}` : '';
+    }
+    
+    console.log("🌐 Fetching tutorías desde:", url);
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     
     if (!response.ok) {
@@ -582,7 +730,28 @@ const fetchTutorias = async (vista = filtroVista) => {
     }
     
     const data = await response.json();
+    console.log(`📊 ${data.length} tutorías cargadas`);
     setTutorias(data || []);
+    
+    // Si es estudiante, verificar inscripciones para cada tutoría
+    if (isEstudiante && vista !== 'mis-cursos') {
+      console.log("🔍 Verificando inscripciones para", data.length, "tutorías");
+      const nuevoEstado = {};
+      
+      // Verificar en paralelo para mejor rendimiento
+      const verificaciones = data.map(async (tutoria) => {
+        const inscrito = await verificarInscripcionTutoria(tutoria.id_tutoria);
+        return { id: tutoria.id_tutoria, inscrito };
+      });
+      
+      const resultados = await Promise.all(verificaciones);
+      resultados.forEach(result => {
+        nuevoEstado[result.id] = result.inscrito;
+      });
+      
+      setEstadoInscripciones(nuevoEstado);
+      console.log("✅ Estado de inscripciones actualizado:", nuevoEstado);
+    }
   } catch (err) {
     setError(err.message);
     console.error('Error fetching tutorias:', err);
@@ -590,6 +759,109 @@ const fetchTutorias = async (vista = filtroVista) => {
     setLoading(false);
   }
 };
+// Función para cargar las tutorías del estudiante
+const fetchTutoriasEstudiante = async () => {
+  if (!isEstudiante) return;
+  
+  try {
+    const token = getToken();
+    
+    // Primero obtener el ID del estudiante
+    const idEstudiante = await obtenerIdEstudiante();
+    
+    if (!idEstudiante) {
+      console.log("⚠️ No se pudo obtener ID de estudiante");
+      return;
+    }
+    
+    console.log("📚 Cargando tutorías para estudiante:", idEstudiante);
+    
+    // Usar el endpoint de tutorías para obtener las tutorías inscritas
+    const response = await fetch(`http://localhost:3000/tutorias/estudiante/inscrito/${idEstudiante}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ ${data.length} tutorías encontradas para el estudiante`);
+      setTutoriasInscritas(data);
+      
+      // Crear mapa de estado de inscripción
+      const estadoMap = {};
+      data.forEach(tutoria => {
+        estadoMap[tutoria.id_tutoria] = true;
+      });
+      setEstadoInscripciones(estadoMap);
+      
+      // Calcular estadísticas
+      calcularEstadisticasEstudiante(data);
+    } else {
+      console.error("❌ Error cargando tutorías del estudiante");
+    }
+  } catch (error) {
+    console.error('Error cargando tutorías del estudiante:', error);
+  }
+};
+
+
+// Función para verificar inscripción específica - CORREGIDA
+const verificarInscripcionTutoria = async (idTutoria) => {
+  if (!isEstudiante) return false;
+  
+  try {
+    const token = getToken();
+    
+    // Primero obtener el ID del estudiante
+    const idEstudiante = await obtenerIdEstudiante();
+    
+    if (!idEstudiante) {
+      console.log("⚠️ No se pudo obtener ID de estudiante para verificar");
+      return false;
+    }
+    
+    console.log("🔍 Verificando inscripción en tutoria:", idTutoria, "para estudiante:", idEstudiante);
+    
+    // Usar el endpoint CORRECTO
+    const response = await fetch(
+      `http://localhost:3000/tutorias/verificar-inscripcion/${idTutoria}/${idEstudiante}`,
+      { 
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("📊 Resultado verificación:", data);
+      return data.inscrito;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error verificando inscripción:', error);
+    return false;
+  }
+};
+// Función para calcular estadísticas del estudiante
+const calcularEstadisticasEstudiante = (tutorias) => {
+  const misCursos = tutorias.length;
+  const cursosActivos = tutorias.filter(t => t.activo).length;
+  const cuposTomados = tutorias.reduce((sum, t) => sum + 1, 0);
+  
+  // Obtener cupos totales del usuario (esto podría venir de otro endpoint)
+  const cuposTotales = 10; // Ejemplo: máximo 10 cursos por estudiante
+  
+  setEstadisticasEstudiante({
+    misCursos,
+    cursosActivos,
+    porCompletar: misCursos - cursosActivos,
+    cuposTomados,
+    cuposTotales
+  });
+};
+
 // Reemplaza la función abrirInscripcion existente
 const abrirInscripcion = (tutoria) => {
   // Verificar si el usuario es estudiante
@@ -607,14 +879,23 @@ const cerrarInscripcion = () => {
   setTutoriaParaInscribir(null);
 };
 
-const handleInscripcionExitosa = () => {
-  // Recargar las tutorías para actualizar cupos disponibles
-  fetchTutorias();
+const handleInscripcionExitosa = async () => {
+  // Recargar tanto las tutorías generales como las del estudiante
+  await fetchTutorias(filtroVista);
+  if (isEstudiante) {
+    await fetchTutoriasEstudiante();
+  }
 };
 
+
 // Modifica el useEffect para recargar cuando cambie el filtroVista
+// Modificar el useEffect para estudiantes
 useEffect(() => {
   fetchTutorias(filtroVista);
+  
+  if (isEstudiante) {
+    fetchTutoriasEstudiante();
+  }
 }, [filtroVista]);
 
 // Modifica la función que cambia el filtro de vista
@@ -902,11 +1183,12 @@ const actualizarTutoria = async (formData) => {
 
   // Filtros combinados
   const tutoriasFiltradas = tutorias.filter(tutoria => {
-    // Filtro por vista (mis tutorías vs todas)
+    if (isEstudiante && filtroVista === 'mis-cursos') {
+      return tutoriasInscritas.some(t => t.id_tutoria === tutoria.id_tutoria);
+    }
     const matchesVista = filtroVista === 'todas' || 
-    (filtroVista === 'mis-tutorias' && esMiTutoria(tutoria));
-
-    // Filtros existentes
+      (filtroVista === 'mis-tutorias' && esMiTutoria(tutoria));
+    
     const matchesInstitucion = !filtros.institucion || tutoria.id_institucion === parseInt(filtros.institucion);
     const matchesEstado = !filtros.estado || 
       (filtros.estado === 'activas' && tutoria.activo) ||
@@ -916,7 +1198,7 @@ const actualizarTutoria = async (formData) => {
       tutoria.sigla.toLowerCase().includes(filtros.search.toLowerCase()) ||
       tutoria.tutor_nombre.toLowerCase().includes(filtros.search.toLowerCase());
 
-     return matchesVista && matchesInstitucion && matchesEstado && matchesSearch;
+    return matchesVista && matchesInstitucion && matchesEstado && matchesSearch;
   });
 
   const handleFiltroChange = (key, value) => {
@@ -986,473 +1268,537 @@ const actualizarTutoria = async (formData) => {
     );
   }
 
- return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 shadow-xl">
-        <div className="p-8">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -translate-x-12 translate-y-12"></div>
-          
-          <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="flex-1">
-              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 leading-tight">
-                Gestión de Tutorías
-              </h1>
-              <p className="text-lg text-indigo-100 opacity-90 max-w-2xl leading-relaxed">
-                {esTutor 
-                  ? 'Gestiona tus tutorías y consulta el catálogo completo'
-                  : 'Administra y organiza todas las tutorías académicas del sistema de manera eficiente'
-                }
-              </p>
-            </div>
-            
-            {(puedeGestionar || esTutor) && (
-              <button
-                onClick={() => setModalOpen(true)}
-                className="group relative px-8 py-4 bg-white text-indigo-700 rounded-xl hover:bg-indigo-50 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 font-semibold"
-              >
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="relative">Nueva Tutoría</span>
-              </button>
-            )}
+return (
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    {/* Header */}
+    <div className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 shadow-xl">
+      <div className="p-8">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -translate-x-12 translate-y-12"></div>
+        
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex-1">
+            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 leading-tight">
+              Gestión de Tutorías
+            </h1>
+            <p className="text-lg text-indigo-100 opacity-90 max-w-2xl leading-relaxed">
+              {esTutor 
+                ? 'Gestiona tus tutorías y consulta el catálogo completo'
+                : isEstudiante
+                ? 'Explora y gestiona tus tutorías académicas'
+                : 'Administra y organiza todas las tutorías académicas del sistema de manera eficiente'
+              }
+            </p>
           </div>
           
-          {/* Separador decorativo con stats actualizadas */}
-          <div className="relative mt-6 pt-6 border-t border-white/20">
-            <div className="flex flex-wrap gap-6 text-sm">
+          {(puedeGestionar || esTutor) && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="group relative px-8 py-4 bg-white text-indigo-700 rounded-xl hover:bg-indigo-50 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 font-semibold"
+            >
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="relative">Nueva Tutoría</span>
+            </button>
+          )}
+        </div>
+        
+        {/* Separador decorativo con stats actualizadas */}
+        <div className="relative mt-6 pt-6 border-t border-white/20">
+          <div className="flex flex-wrap gap-6 text-sm">
+            <div className="flex items-center space-x-2 text-white/80">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+              <span>{estadisticas.activas} Tutorías Activas</span>
+            </div>
+            <div className="flex items-center space-x-2 text-white/80">
+              <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+              <span>{estadisticas.total} Total de Tutorías</span>
+            </div>
+            {esTutor && (
               <div className="flex items-center space-x-2 text-white/80">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span>{estadisticas.activas} Tutorías Activas</span>
+                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                <span>{estadisticas.misTutorias} Mis Tutorías</span>
               </div>
+            )}
+            {isEstudiante && (
               <div className="flex items-center space-x-2 text-white/80">
-                <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                <span>{estadisticas.total} Total de Tutorías</span>
+                <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
+                <span>{estadisticasEstudiante.misCursos || 0} Mis Cursos</span>
               </div>
-              {esTutor && (
-                <div className="flex items-center space-x-2 text-white/80">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <span>{estadisticas.misTutorias} Mis Tutorías</span>
-                </div>
-              )}
-              <div className="flex items-center space-x-2 text-white/80">
-                <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                <span>{estadisticas.instituciones} Instituciones</span>
-              </div>
+            )}
+            <div className="flex items-center space-x-2 text-white/80">
+              <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+              <span>{estadisticas.instituciones} Instituciones</span>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      {/* Contenido principal */}
-      <div className="p-6">
-        {/* Stats Mejoradas */}
-        <div className={`grid gap-6 mb-8 ${esTutor ? 'grid-cols-1 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-4'}`}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-              {estadisticas.total}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-              Total Tutorías
-            </div>
+    {/* Menú para Estudiantes */}
+    {isEstudiante && (
+      <div className="px-6 pt-6">
+        <MenuEstudiante 
+          filtroVista={filtroVista}
+          setFiltroVista={setFiltroVista}
+          estadisticasEstudiante={estadisticasEstudiante}
+        />
+      </div>
+    )}
+
+    {/* Contenido principal */}
+    <div className="p-6">
+      {/* Stats Mejoradas */}
+      <div className={`grid gap-6 mb-8 ${isEstudiante ? 'grid-cols-1 md:grid-cols-4' : esTutor ? 'grid-cols-1 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-4'}`}>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+            {estadisticas.total}
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
-              {estadisticas.activas}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-              Tutorías Activas
-            </div>
-          </div>
-          {esTutor && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-2">
-                {estadisticas.misTutorias}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                Mis Tutorías
-              </div>
-            </div>
-          )}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-2">
-              {estadisticas.instituciones}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-              Instituciones
-            </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Total Tutorías
           </div>
         </div>
-
-        {/* NUEVO: Filtro de Vista para Tutores */}
-        {esTutor && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-6 shadow-lg">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Vista de Tutorías
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Selecciona qué tutorías deseas visualizar
-                </p>
-              </div>
-              <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                <button
-                  onClick={() => setFiltroVista('mis-tutorias')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    filtroVista === 'mis-tutorias'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Mis Tutorías
-                </button>
-                <button
-                  onClick={() => setFiltroVista('todas')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    filtroVista === 'todas'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Todas las Tutorías
-                </button>
-              </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
+            {estadisticas.activas}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Tutorías Activas
+          </div>
+        </div>
+        
+        {/* Estadística para Estudiantes - Mis Cursos */}
+        {isEstudiante && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-2">
+              {estadisticasEstudiante.misCursos || 0}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+              Mis Cursos
             </div>
           </div>
         )}
-
-        {/* Filtros Mejorados */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-8 shadow-lg">
-          <div className="flex flex-col lg:flex-row gap-4 mb-4">
-            {/* Búsqueda */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Buscar
-              </label>
-              <input
-                type="text"
-                value={filtros.search}
-                onChange={(e) => handleFiltroChange('search', e.target.value)}
-                placeholder="Buscar tutoría, sigla o tutor..."
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-              />
+        
+        {/* Estadística para Tutores - Mis Tutorías */}
+        {esTutor && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-2">
+              {estadisticas.misTutorias}
             </div>
-
-            {/* Filtro por Institución */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Institución
-              </label>
-              <select
-                value={filtros.institucion}
-                onChange={(e) => handleFiltroChange('institucion', e.target.value)}
-                className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-              >
-                <option value="">Todas las instituciones</option>
-                {instituciones.map(inst => (
-                  <option key={inst.id_institucion} value={inst.id_institucion}>
-                    {inst.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filtro por Estado */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Estado
-              </label>
-              <select
-                value={filtros.estado}
-                onChange={(e) => handleFiltroChange('estado', e.target.value)}
-                className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-              >
-                <option value="">Todos los estados</option>
-                <option value="activas">Activas</option>
-                <option value="inactivas">Inactivas</option>
-              </select>
+            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+              Mis Tutorías
             </div>
           </div>
+        )}
+        
+        {/* Última estadística común */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-2">
+            {estadisticas.instituciones}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Instituciones
+          </div>
+        </div>
+      </div>
 
-          {/* Botones de acción */}
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Mostrando {tutoriasFiltradas.length} de {estadisticas.total} tutorías
-              {esTutor && filtroVista === 'mis-tutorias' && ` (${estadisticas.misTutorias} mis tutorías)`}
+      {/* NUEVO: Filtro de Vista para Tutores */}
+      {esTutor && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-6 shadow-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Vista de Tutorías
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Selecciona qué tutorías deseas visualizar
+              </p>
             </div>
-            <button
+            <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+              <button
+                onClick={() => setFiltroVista('mis-tutorias')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  filtroVista === 'mis-tutorias'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Mis Tutorías
+              </button>
+              <button
+                onClick={() => setFiltroVista('todas')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  filtroVista === 'todas'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Todas las Tutorías
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros Mejorados */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-8 shadow-lg">
+        <div className="flex flex-col lg:flex-row gap-4 mb-4">
+          {/* Búsqueda */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Buscar
+            </label>
+            <input
+              type="text"
+              value={filtros.search}
+              onChange={(e) => handleFiltroChange('search', e.target.value)}
+              placeholder="Buscar tutoría, sigla o tutor..."
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+            />
+          </div>
+
+          {/* Filtro por Institución */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Institución
+            </label>
+            <select
+              value={filtros.institucion}
+              onChange={(e) => handleFiltroChange('institucion', e.target.value)}
+              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+            >
+              <option value="">Todas las instituciones</option>
+              {instituciones.map(inst => (
+                <option key={inst.id_institucion} value={inst.id_institucion}>
+                  {inst.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Estado */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Estado
+            </label>
+            <select
+              value={filtros.estado}
+              onChange={(e) => handleFiltroChange('estado', e.target.value)}
+              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+            >
+              <option value="">Todos los estados</option>
+              <option value="activas">Activas</option>
+              <option value="inactivas">Inactivas</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Botones de acción */}
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Mostrando {tutoriasFiltradas.length} de {estadisticas.total} tutorías
+            {esTutor && filtroVista === 'mis-tutorias' && ` (${estadisticas.misTutorias} mis tutorías)`}
+            {isEstudiante && filtroVista === 'mis-cursos' && ` (${estadisticasEstudiante.misCursos || 0} mis cursos)`}
+          </div>
+          <button
+            onClick={limpiarFiltros}
+            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors duration-200"
+          >
+            Limpiar Filtros
+          </button>
+        </div>
+      </div>
+
+      {/* Grid de Tutorías Mejorado */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tutoriasFiltradas.map((tutoria) => {
+          const cuposDisponibles = tutoria.cupos_disponibles !== undefined ? tutoria.cupos_disponibles : tutoria.cupo;
+          const inscritosActuales = tutoria.inscritos_actuales || 0;
+          const esMiTutoria = esTutor && tutoria.id_tutor === user.id_usuario;
+          const estaInscrito = isEstudiante && estadoInscripciones[tutoria.id_tutoria];
+          
+          return (
+            <div 
+              key={tutoria.id_tutoria}
+              className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700 overflow-hidden"
+            >
+              {/* Header con logo y nombre */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+                <div className="flex items-start space-x-4">
+                  {/* Logo con iniciales */}
+                  <div className={`flex-shrink-0 w-16 h-16 rounded-xl ${getColorLogo(tutoria.nombre_tutoria)} flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    {getIniciales(tutoria.nombre_tutoria)}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-2 leading-tight">
+                      {tutoria.nombre_tutoria}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 font-medium">
+                      {tutoria.sigla}
+                    </p>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <Badge color={tutoria.activo ? "green" : "red"}>
+                        {tutoria.activo ? "Activa" : "Inactiva"}
+                      </Badge>
+                      <Badge color={getCupoColor(cuposDisponibles)}>
+                        {inscritosActuales}/{tutoria.cupo} inscritos
+                      </Badge>
+                      {esMiTutoria && (
+                        <Badge color="blue" size="sm">
+                          Mi tutoría
+                        </Badge>
+                      )}
+                      {isEstudiante && estaInscrito && (
+                        <Badge color="green" size="sm">
+                          <div className="flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Inscrito
+                          </div>
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Información de la tutoría */}
+              <div className="p-6 space-y-4">
+                {/* Descripción */}
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500 mt-0.5">
+                    <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed">
+                      {tutoria.descripcion_tutoria || 'Sin descripción disponible'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tutor */}
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
+                    <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Tutor:</span> {tutoria.tutor_nombre}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Institución */}
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
+                    <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Institución:</span> {tutoria.institucion_nombre}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cupos Disponibles */}
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
+                    <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${
+                      cuposDisponibles > 0 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {cuposDisponibles > 0 
+                        ? `${cuposDisponibles} cupos disponibles` 
+                        : 'Cupo completo'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer con acciones */}
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                    ID: {tutoria.id_tutoria}
+                    {isGerente && tutoria.id_usuario_gerente === user.id_usuario && (
+                      <Badge color="blue" size="sm" className="ml-2">
+                        Tu institución
+                      </Badge>
+                    )}
+                  </span>
+                  
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => verDetalles(tutoria)}
+                      className="group relative text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:scale-105"
+                    >
+                      <span className="relative z-10">Detalles</span>
+                    </button>
+                    
+                    {/* Mostrar botón Editar SOLO en "Mis Tutorías" o si es admin/gerente */}
+                    {(filtroVista === 'mis-tutorias' || puedeGestionar) && (
+                      <button 
+                        onClick={() => handleEdit(tutoria)}
+                        className="group relative text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:scale-105 disabled:opacity-50"
+                        disabled={updating === tutoria.id_tutoria || (esTutor && !tutorPuedeEditar(tutoria))}
+                      >
+                        <span className="relative z-10">Editar</span>
+                      </button>
+                    )}
+                    
+                    {/* Resto de acciones para admin/gerente */}
+                    {puedeGestionar && puedeGestionarTutoria(tutoria) && (
+                      <>
+                        <button 
+                          onClick={() => handleToggleEstado(tutoria)}
+                          disabled={updating === tutoria.id_tutoria}
+                          className={`group relative text-sm font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:scale-105 disabled:opacity-50 ${
+                            tutoria.activo
+                              ? 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30'
+                              : 'text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/30'
+                          }`}
+                        >
+                          {updating === tutoria.id_tutoria ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <span className="relative z-10">
+                              {tutoria.activo ? 'Desactivar' : 'Activar'}
+                            </span>
+                          )}
+                        </button>
+
+                        {isAdmin && (
+                          <button 
+                            onClick={() => eliminarTutoria(tutoria.id_tutoria)}
+                            disabled={updating === tutoria.id_tutoria}
+                            className="group relative text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:scale-105 disabled:opacity-50"
+                          >
+                            <span className="relative z-10">Eliminar</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Acciones para TUTORES en SUS tutorías */}
+                    {esTutor && esMiTutoria && (
+                      <button 
+                        onClick={() => handleEdit(tutoria)}
+                        className="group relative text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:scale-105 disabled:opacity-50"
+                        disabled={updating === tutoria.id_tutoria}
+                      >
+                        <span className="relative z-10">Editar</span>
+                      </button>
+                    )}
+                    
+                    {/* Botón de inscripción para estudiantes - CONDICIONAL */}
+                    {isEstudiante && !estaInscrito && tutoria.cupos_disponibles > 0 && tutoria.activo && (
+                      <button 
+                        onClick={() => abrirInscripcion(tutoria)}
+                        className="group relative text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 hover:scale-105"
+                      >
+                        <span className="relative z-10">Inscribirse</span>
+                      </button>
+                    )}
+                    
+                    {/* Si el estudiante ya está inscrito, no mostrar botón de inscripción */}
+                    {isEstudiante && estaInscrito && (
+                      <Badge color="green" size="sm">
+                        Ya inscrito
+                      </Badge>
+                    )}
+                    
+                    {/* Botón de inscripción para otros roles (si es necesario) */}
+                    {!isEstudiante && !puedeGestionar && !esTutor && tutoria.cupos_disponibles > 0 && tutoria.activo && (
+                      <button 
+                        onClick={() => abrirInscripcion(tutoria)}
+                        className="group relative text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 hover:scale-105"
+                      >
+                        <span className="relative z-10">Inscribirse</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mensaje si no hay tutorías */}
+      {tutoriasFiltradas.length === 0 && !loading && (
+        <div className="text-center py-16">
+          <div className="text-gray-400 dark:text-gray-500 mb-6">
+            <svg className="mx-auto h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+            No hay tutorías disponibles
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 text-lg">
+            {tutorias.length === 0 
+              ? 'No se encontraron tutorías para mostrar en este momento.'
+              : 'No hay tutorías que coincidan con los filtros aplicados.'
+            }
+          </p>
+          {tutorias.length > 0 ? (
+            <button 
               onClick={limpiarFiltros}
-              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors duration-200"
+              className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 hover:scale-105 font-semibold"
             >
               Limpiar Filtros
             </button>
-          </div>
+          ) : (puedeGestionar || esTutor) ? (
+            <button 
+              onClick={() => setModalOpen(true)}
+              className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 hover:scale-105 font-semibold"
+            >
+              Agregar Primera Tutoría
+            </button>
+          ) : null}
         </div>
+      )}
+    </div>
 
-        {/* Grid de Tutorías Mejorado */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tutoriasFiltradas.map((tutoria) => {
-            const cuposDisponibles = tutoria.cupos_disponibles !== undefined ? tutoria.cupos_disponibles : tutoria.cupo;
-            const inscritosActuales = tutoria.inscritos_actuales || 0;
-            const esMiTutoria = esTutor && tutoria.id_tutor === user.id_usuario;
-            
-            return (
-              <div 
-                key={tutoria.id_tutoria}
-                className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700 overflow-hidden"
-              >
-                {/* Header con logo y nombre */}
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
-                  <div className="flex items-start space-x-4">
-                    {/* Logo con iniciales */}
-                    <div className={`flex-shrink-0 w-16 h-16 rounded-xl ${getColorLogo(tutoria.nombre_tutoria)} flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                      {getIniciales(tutoria.nombre_tutoria)}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-2 leading-tight">
-                        {tutoria.nombre_tutoria}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 font-medium">
-                        {tutoria.sigla}
-                      </p>
-                      <div className="flex items-center flex-wrap gap-2">
-                        <Badge color={tutoria.activo ? "green" : "red"}>
-                          {tutoria.activo ? "Activa" : "Inactiva"}
-                        </Badge>
-                        <Badge color={getCupoColor(cuposDisponibles)}>
-                          {inscritosActuales}/{tutoria.cupo} inscritos
-                        </Badge>
-                        {esMiTutoria && (
-                          <Badge color="blue" size="sm">
-                            Mi tutoría
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+    {/* Modales */}
+    <TutoriaModal
+      isOpen={modalOpen}
+      onClose={() => {
+        setModalOpen(false);
+        setEditingTutoria(null);
+      }}
+      onSave={editingTutoria ? actualizarTutoria : crearTutoria}
+      tutoria={editingTutoria}
+      isEdit={!!editingTutoria}
+      esTutor={esTutor}
+    />
 
-                {/* Información de la tutoría */}
-                <div className="p-6 space-y-4">
-                  {/* Descripción */}
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500 mt-0.5">
-                      <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed">
-                        {tutoria.descripcion_tutoria || 'Sin descripción disponible'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Tutor */}
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
-                      <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">Tutor:</span> {tutoria.tutor_nombre}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Institución */}
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
-                      <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">Institución:</span> {tutoria.institucion_nombre}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Cupos Disponibles */}
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0 w-5 h-5 text-gray-400 dark:text-gray-500">
-                      <svg fill="currentColor" viewBox="0 0 20 20" className="w-4 h-4">
-                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className={`text-sm font-semibold ${
-                        cuposDisponibles > 0 
-                          ? 'text-green-600 dark:text-green-400' 
-                          : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {cuposDisponibles > 0 
-                          ? `${cuposDisponibles} cupos disponibles` 
-                          : 'Cupo completo'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer con acciones - MEJORADO para tutores */}
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                      ID: {tutoria.id_tutoria}
-                      {isGerente && tutoria.id_usuario_gerente === user.id_usuario && (
-                        <Badge color="blue" size="sm" className="ml-2">
-                          Tu institución
-                        </Badge>
-                      )}
-                    </span>
-                    
-                    <div className="flex space-x-2">
-                      <button 
-                        onClick={() => verDetalles(tutoria)}
-                        className="group relative text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:scale-105"
-                      >
-                        <span className="relative z-10">Detalles</span>
-                      </button>
-                      
-                      {/* Mostrar botón Editar SOLO en "Mis Tutorías" o si es admin/gerente */}
-                      {(filtroVista === 'mis-tutorias' || puedeGestionar) && (
-                        <button 
-                          onClick={() => handleEdit(tutoria)}
-                          className="group relative text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:scale-105 disabled:opacity-50"
-                          disabled={updating === tutoria.id_tutoria || (esTutor && !tutorPuedeEditar(tutoria))}
-                        >
-                          <span className="relative z-10">Editar</span>
-                        </button>
-                      )}
-                      
-                      {/* Resto de acciones para admin/gerente */}
-                      {puedeGestionar && puedeGestionarTutoria(tutoria) && (
-                        <>
-                          <button 
-                            onClick={() => handleToggleEstado(tutoria)}
-                            disabled={updating === tutoria.id_tutoria}
-                            className={`group relative text-sm font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:scale-105 disabled:opacity-50 ${
-                              tutoria.activo
-                                ? 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30'
-                                : 'text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/30'
-                            }`}
-                          >
-                            {updating === tutoria.id_tutoria ? (
-                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <span className="relative z-10">
-                                {tutoria.activo ? 'Desactivar' : 'Activar'}
-                              </span>
-                            )}
-                          </button>
-
-                          {isAdmin && (
-                            <button 
-                              onClick={() => eliminarTutoria(tutoria.id_tutoria)}
-                              disabled={updating === tutoria.id_tutoria}
-                              className="group relative text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:scale-105 disabled:opacity-50"
-                            >
-                              <span className="relative z-10">Eliminar</span>
-                            </button>
-                          )}
-                        </>
-                      )}
-                      
-                      {/* Acciones para TUTORES en SUS tutorías */}
-                      {esTutor && esMiTutoria && (
-                        <button 
-                          onClick={() => handleEdit(tutoria)}
-                          className="group relative text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:scale-105 disabled:opacity-50"
-                          disabled={updating === tutoria.id_tutoria}
-                        >
-                          <span className="relative z-10">Editar</span>
-                        </button>
-                      )}
-                      
-                      {/* Botón de inscripción para estudiantes */}
-                      {!puedeGestionar && !esTutor && tutoria.cupos_disponibles > 0 && tutoria.activo && (
-                        <button 
-                          onClick={() => abrirInscripcion(tutoria)}
-                          className="group relative text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold transition-all duration-200 px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 hover:scale-105"
-                        >
-                          <span className="relative z-10">Inscribirse</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Mensaje si no hay tutorías */}
-        {tutoriasFiltradas.length === 0 && !loading && (
-          <div className="text-center py-16">
-            <div className="text-gray-400 dark:text-gray-500 mb-6">
-              <svg className="mx-auto h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-              No hay tutorías disponibles
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 text-lg">
-              {tutorias.length === 0 
-                ? 'No se encontraron tutorías para mostrar en este momento.'
-                : 'No hay tutorías que coincidan con los filtros aplicados.'
-              }
-            </p>
-            {tutorias.length > 0 ? (
-              <button 
-                onClick={limpiarFiltros}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 hover:scale-105 font-semibold"
-              >
-                Limpiar Filtros
-              </button>
-            ) : (puedeGestionar || esTutor) ? (
-              <button 
-                onClick={() => setModalOpen(true)}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 hover:scale-105 font-semibold"
-              >
-                Agregar Primera Tutoría
-              </button>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {/* Modales */}
-      <TutoriaModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingTutoria(null);
-        }}
-        onSave={editingTutoria ? actualizarTutoria : crearTutoria}
-        tutoria={editingTutoria}
-        isEdit={!!editingTutoria}
-        esTutor={esTutor}
-      />
-
-      <DetallesTutoria
-        tutoria={tutoriaSeleccionada}
-        onClose={() => {
-          setDetallesOpen(false);
-          setTutoriaSeleccionada(null);
-        }}
-      />
-      {/* Modal de Inscripción */}
-    {/* NUEVO: Modal de Inscripción */}
+    <DetallesTutoria
+      tutoria={tutoriaSeleccionada}
+      onClose={() => {
+        setDetallesOpen(false);
+        setTutoriaSeleccionada(null);
+      }}
+    />
+    
+    {/* Modal de Inscripción */}
     {mostrarInscripcion && tutoriaParaInscribir && (
       <Inscripcion
         tutoria={tutoriaParaInscribir}
@@ -1460,8 +1806,8 @@ const actualizarTutoria = async (formData) => {
         onInscripcionExitosa={handleInscripcionExitosa}
       />
     )}
-    </div>
-  );
+  </div>
+);
 };
 
 export default Tutoria;
