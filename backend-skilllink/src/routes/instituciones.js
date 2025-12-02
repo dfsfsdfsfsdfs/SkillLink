@@ -23,7 +23,17 @@ const upload = multer({
     }
   }
 });
-
+router.get("/public/activas", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id_institucion, nombre FROM public.institucion WHERE activo = TRUE ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener instituciones públicas:", error.message);
+    res.status(500).json({ error: "Error al obtener instituciones" });
+  }
+});
 // Aplicar middleware de autenticación a todas las rutas
 router.use(verificarToken);
 
@@ -268,67 +278,186 @@ router.put("/:id", async (req, res) => {
     client.release();
   }
 });
-// PATCH - Activar/Desactivar institución (SOLO ADMIN)
+
+// PATCH - Activar/Desactivar institución (SOLO ADMIN) - VERSIÓN COMPLETA CON REACTIVACIÓN
 router.patch("/:id/estado", verificarRol([1]), async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     
     const { id } = req.params;
-    const { activo } = req.body;
+    const { activo, desactivar_dependencias = false, reactivar_dependencias = false } = req.body;
     
     if (typeof activo !== 'boolean') {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: "El campo 'activo' es requerido y debe ser booleano" });
     }
     
-    // Si se está desactivando, verificar dependencias
+    // Obtener información de la institución
+    const institucionResult = await client.query(
+      "SELECT * FROM public.institucion WHERE id_institucion = $1",
+      [id]
+    );
+    
+    if (institucionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Institución no encontrada" });
+    }
+    
+    const institucion = institucionResult.rows[0];
+    const institucionNombre = institucion.nombre;
+    
+    // Declarar variables
+    let aulasAfectadas = 0;
+    let tutoriasAfectadas = 0;
+    let aulasReactivadas = 0;
+    let tutoriasReactivadas = 0;
+    
+    // SI SE ESTÁ DESACTIVANDO
     if (!activo) {
+      console.log(`🔧 Desactivando institución "${institucionNombre}" (ID: ${id})`);
+      
+      // Verificar dependencias activas
       const aulas = await client.query(
-        "SELECT COUNT(*) as total FROM public.aula WHERE id_institucion = $1 AND activo = TRUE",
+        "SELECT COUNT(*) as total, ARRAY_AGG(id_aula) as ids FROM public.aula WHERE id_institucion = $1 AND activo = TRUE",
         [id]
       );
-      
-      if (parseInt(aulas.rows[0].total) > 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          error: "No se puede desactivar la institución porque tiene aulas activas asociadas" 
-        });
-      }
       
       const tutorias = await client.query(
-        "SELECT COUNT(*) as total FROM public.tutoria WHERE id_institucion = $1 AND activo = TRUE",
+        "SELECT COUNT(*) as total, ARRAY_AGG(id_tutoria) as ids FROM public.tutoria WHERE id_institucion = $1 AND activo = TRUE",
         [id]
       );
       
-      if (parseInt(tutorias.rows[0].total) > 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          error: "No se puede desactivar la institución porque tiene tutorías activas asociadas" 
-        });
+      aulasAfectadas = parseInt(aulas.rows[0].total) || 0;
+      tutoriasAfectadas = parseInt(tutorias.rows[0].total) || 0;
+      
+      // Si hay dependencias activas
+      if (aulasAfectadas > 0 || tutoriasAfectadas > 0) {
+        // Si NO se pidió desactivar dependencias, mostrar error
+        if (!desactivar_dependencias) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ 
+            error: "No se puede desactivar la institución porque tiene dependencias activas",
+            detalles: {
+              aulas_activas: aulasAfectadas,
+              tutorias_activas: tutoriasAfectadas,
+              necesita_confirmacion: true
+            }
+          });
+        }
+        
+        // Si SÍ se pidió desactivar dependencias, proceder
+        console.log(`   - Desactivando dependencias...`);
+        
+        // 1. Desactivar tutorías
+        if (tutoriasAfectadas > 0) {
+          console.log(`     • Desactivando ${tutoriasAfectadas} tutoría(s)`);
+          const tutoriasResult = await client.query(
+            "UPDATE public.tutoria SET activo = FALSE WHERE id_institucion = $1 AND activo = TRUE RETURNING id_tutoria",
+            [id]
+          );
+          tutoriasAfectadas = tutoriasResult.rowCount || 0;
+        }
+        
+        // 2. Desactivar aulas
+        if (aulasAfectadas > 0) {
+          console.log(`     • Desactivando ${aulasAfectadas} aula(s)`);
+          const aulasResult = await client.query(
+            "UPDATE public.aula SET activo = FALSE WHERE id_institucion = $1 AND activo = TRUE RETURNING id_aula",
+            [id]
+          );
+          aulasAfectadas = aulasResult.rowCount || 0;
+        }
+        
+        console.log(`✅ Dependencias desactivadas: ${aulasAfectadas} aulas, ${tutoriasAfectadas} tutorías`);
+      }
+    } 
+    // SI SE ESTÁ ACTIVANDO
+    else {
+      console.log(`🔧 Activando institución "${institucionNombre}" (ID: ${id})`);
+      
+      // Verificar si hay dependencias inactivas que podrían reactivarse
+      if (reactivar_dependencias) {
+        const aulasInactivas = await client.query(
+          "SELECT COUNT(*) as total FROM public.aula WHERE id_institucion = $1 AND activo = FALSE",
+          [id]
+        );
+        
+        const tutoriasInactivas = await client.query(
+          "SELECT COUNT(*) as total FROM public.tutoria WHERE id_institucion = $1 AND activo = FALSE",
+          [id]
+        );
+        
+        const totalAulasInactivas = parseInt(aulasInactivas.rows[0].total) || 0;
+        const totalTutoriasInactivas = parseInt(tutoriasInactivas.rows[0].total) || 0;
+        
+        console.log(`   - Encontradas: ${totalAulasInactivas} aulas inactivas, ${totalTutoriasInactivas} tutorías inactivas`);
+        
+        // Reactivar tutorías
+        if (totalTutoriasInactivas > 0) {
+          console.log(`     • Reactivando ${totalTutoriasInactivas} tutoría(s)`);
+          const tutoriasResult = await client.query(
+            "UPDATE public.tutoria SET activo = TRUE WHERE id_institucion = $1 AND activo = FALSE RETURNING id_tutoria",
+            [id]
+          );
+          tutoriasReactivadas = tutoriasResult.rowCount || 0;
+        }
+        
+        // Reactivar aulas
+        if (totalAulasInactivas > 0) {
+          console.log(`     • Reactivando ${totalAulasInactivas} aula(s)`);
+          const aulasResult = await client.query(
+            "UPDATE public.aula SET activo = TRUE WHERE id_institucion = $1 AND activo = FALSE RETURNING id_aula",
+            [id]
+          );
+          aulasReactivadas = aulasResult.rowCount || 0;
+        }
+        
+        console.log(`✅ Dependencias reactivadas: ${aulasReactivadas} aulas, ${tutoriasReactivadas} tutorías`);
+      } else {
+        console.log(`   - Modo normal: solo se activa la institución, no sus dependencias`);
       }
     }
     
+    // Finalmente, cambiar el estado de la institución
     const result = await client.query(
       `UPDATE public.institucion SET activo = $1 
        WHERE id_institucion = $2 RETURNING *`,
       [activo, id]
     );
 
-    if (result.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: "Institución no encontrada" });
-    }
-
     await client.query('COMMIT');
-    res.json({ 
+    
+    // Preparar respuesta
+    const respuesta = { 
       mensaje: `Institución ${activo ? 'activada' : 'desactivada'} correctamente`,
       institucion: result.rows[0]
-    });
+    };
+    
+    // Agregar detalles según la operación
+    if (!activo && desactivar_dependencias) {
+      respuesta.dependencias_desactivadas = true;
+      respuesta.resumen = {
+        aulas_desactivadas: aulasAfectadas,
+        tutorias_desactivadas: tutoriasAfectadas
+      };
+    } else if (activo && reactivar_dependencias) {
+      respuesta.dependencias_reactivadas = true;
+      respuesta.resumen = {
+        aulas_reactivadas: aulasReactivadas,
+        tutorias_reactivadas: tutoriasReactivadas
+      };
+    }
+    
+    res.json(respuesta);
+    
   } catch (error) {
     await client.query('ROLLBACK');
     console.error("Error al cambiar estado de institución:", error.message);
-    res.status(500).json({ error: "Error al cambiar estado de institución" });
+    res.status(500).json({ 
+      error: "Error al cambiar estado de institución",
+      detalles: error.message 
+    });
   } finally {
     client.release();
   }

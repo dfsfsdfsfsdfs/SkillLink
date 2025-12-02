@@ -2,6 +2,195 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
+// Componentes separados fuera del componente principal
+const PreguntaDesarrollo = React.memo(({ pregunta, index, respuesta, onChange }) => {
+  return (
+    <div className="space-y-6">
+      {/* Enunciado */}
+      <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-2xl p-6 border border-orange-200 dark:border-orange-800">
+        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
+          {pregunta.descripcion || pregunta.enunciado}
+        </p>
+        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
+          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
+            {pregunta.enunciado}
+          </p>
+        )}
+      </div>
+
+      {/* Área de texto para respuesta */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-lg font-semibold text-gray-900 dark:text-white">
+            📝 Tu respuesta:
+          </label>
+          <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+            {respuesta?.respuesta_desarrollo?.length || 0} caracteres
+          </span>
+        </div>
+        
+        <div className="relative">
+          <textarea
+            className="w-full min-h-[200px] p-4 text-base border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 focus:outline-none transition-all duration-200 resize-y"
+            placeholder="Escribe tu respuesta detallada aquí..."
+            value={respuesta?.respuesta_desarrollo || ""}
+            onChange={(e) => onChange(index, e.target.value)}
+            rows={8}
+          />
+        </div>
+        
+        {/* Consejos para desarrollo */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">💡</span>
+            </div>
+            <div>
+              <p className="text-amber-800 dark:text-amber-300 text-sm font-medium">
+                Consejo: Sé claro y detallado en tu respuesta. Incluye ejemplos cuando sea posible.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const PreguntaVerdaderoFalso = React.memo(({ pregunta, index, respuesta, onChange }) => {
+  return (
+    <div className="space-y-6">
+      {/* Enunciado */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
+        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
+          {pregunta.descripcion || pregunta.enunciado}
+        </p>
+        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
+          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
+            {pregunta.enunciado}
+          </p>
+        )}
+      </div>
+
+      {/* Opciones V/F con diseño mejorado */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {pregunta.opciones && pregunta.opciones.map((opcion) => (
+          <label 
+            key={opcion.id}
+            className={`relative flex items-center justify-center p-6 rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 ${
+              respuesta?.inciso_seleccionado === opcion.inciso
+                ? opcion.inciso === 'V' 
+                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 shadow-lg'
+                  : 'border-rose-500 bg-rose-50 dark:bg-rose-900/20 shadow-lg'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
+            }`}
+          >
+            <input
+              type="radio"
+              name={`pregunta-${index}`}
+              value={opcion.inciso}
+              checked={respuesta?.inciso_seleccionado === opcion.inciso}
+              onChange={() => onChange(index, opcion.inciso)}
+              className="sr-only"
+            />
+            <div className="text-center">
+              <div className={`text-4xl font-bold mb-2 ${
+                opcion.inciso === 'V' 
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {opcion.inciso}
+              </div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {opcion.texto}
+              </div>
+            </div>
+            
+            {/* Indicador de selección */}
+            {respuesta?.inciso_seleccionado === opcion.inciso && (
+              <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+const PreguntaOpcionMultiple = React.memo(({ pregunta, index, respuesta, onChange }) => {
+  return (
+    <div className="space-y-6">
+      {/* Enunciado */}
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl p-6 border border-purple-200 dark:border-purple-800">
+        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
+          {pregunta.descripcion || pregunta.enunciado}
+        </p>
+        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
+          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
+            {pregunta.enunciado}
+          </p>
+        )}
+      </div>
+
+      {/* Opciones con diseño de tarjetas - MEJORADO */}
+      <div className="grid grid-cols-1 gap-3">
+        {pregunta.opciones && pregunta.opciones.map((opcion) => (
+          <label 
+            key={opcion.id}
+            className={`relative flex items-start space-x-4 p-5 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${
+              respuesta?.inciso_seleccionado === opcion.inciso
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
+            }`}
+          >
+            <input
+              type="radio"
+              name={`pregunta-${index}`}
+              value={opcion.inciso}
+              checked={respuesta?.inciso_seleccionado === opcion.inciso}
+              onChange={() => onChange(index, opcion.inciso)}
+              className="mt-1 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start space-x-3">
+                <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded-full text-sm font-bold flex-shrink-0 mt-1">
+                  {opcion.inciso}
+                </span>
+                <div>
+                  <span className="text-lg font-medium text-gray-900 dark:text-white block">
+                    <span className="font-bold">{opcion.inciso})</span> {opcion.texto}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {respuesta?.inciso_seleccionado === opcion.inciso && (
+              <div className="flex-shrink-0 text-green-500">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </label>
+        ))}
+      </div>
+      
+      {/* Debug info - solo en desarrollo */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <strong>Debug:</strong> {pregunta.opciones?.length || 0} opciones cargadas para pregunta {pregunta.numero_preg}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+});
+
 const ResolverEvaluacion = ({ evaluacion, inscripcionId, onFinalizar }) => {
   const [preguntas, setPreguntas] = useState([]);
   const [respuestas, setRespuestas] = useState({});
@@ -95,58 +284,57 @@ const ResolverEvaluacion = ({ evaluacion, inscripcionId, onFinalizar }) => {
     return 'opcion_multiple';
   };
 
-// FUNCIÓN MEJORADA: Crear opciones con manejo robusto
-const crearOpcionesParaPregunta = async (pregunta, tipoPregunta) => {
-  let opciones = [];
+  // FUNCIÓN MEJORADA: Crear opciones con manejo robusto
+  const crearOpcionesParaPregunta = async (pregunta, tipoPregunta) => {
+    let opciones = [];
 
-  if (tipoPregunta === 'verdadero_falso') {
-    opciones = [
-      { 
-        inciso: 'V', 
-        texto: 'Verdadero', 
-        id: `${pregunta.numero_preg}-V`,
-        inciso_original: 'V'
-      },
-      { 
-        inciso: 'F', 
-        texto: 'Falso', 
-        id: `${pregunta.numero_preg}-F`,
-        inciso_original: 'F'
-      }
-    ];
-    
-  } else if (tipoPregunta === 'opcion_multiple') {
-    const opcionesBD = await cargarOpcionesPregunta(pregunta.numero_preg);
-    
-    if (opcionesBD && opcionesBD.length > 0) {
-      // 🎯 CORRECCIÓN: Usar letras A,B,C,D directamente
-      opciones = opcionesBD.map((opcion, index) => {
-        const letra = String.fromCharCode(65 + index); // 0->A, 1->B, 2->C, 3->D
-        return {
-          inciso: letra, // Mostrar como A, B, C, D
-          texto: opcion.respuesta_opcion || '',
-          id: `${pregunta.numero_preg}-${letra}`,
-          inciso_original: letra,
-          inciso_bd: opcion.inciso // Guardar el inciso original de BD para debug
-        };
-      });
-      
-      console.log(`✅ Opciones múltiple para pregunta ${pregunta.numero_preg}:`, 
-        opciones.map(op => `${op.inciso} (BD:${op.inciso_bd}): ${op.texto.substring(0, 30)}...`)
-      );
-    } else {
-      // Fallback con opciones A, B, C, D
+    if (tipoPregunta === 'verdadero_falso') {
       opciones = [
-        { inciso: 'A', texto: 'Opción A', id: `${pregunta.numero_preg}-A`, inciso_original: 'A' },
-        { inciso: 'B', texto: 'Opción B', id: `${pregunta.numero_preg}-B`, inciso_original: 'B' },
-        { inciso: 'C', texto: 'Opción C', id: `${pregunta.numero_preg}-C`, inciso_original: 'C' },
-        { inciso: 'D', texto: 'Opción D', id: `${pregunta.numero_preg}-D`, inciso_original: 'D' }
+        { 
+          inciso: 'V', 
+          texto: 'Verdadero', 
+          id: `${pregunta.numero_preg}-V`,
+          inciso_original: 'V'
+        },
+        { 
+          inciso: 'F', 
+          texto: 'Falso', 
+          id: `${pregunta.numero_preg}-F`,
+          inciso_original: 'F'
+        }
       ];
+      
+    } else if (tipoPregunta === 'opcion_multiple') {
+      const opcionesBD = await cargarOpcionesPregunta(pregunta.numero_preg);
+      
+      if (opcionesBD && opcionesBD.length > 0) {
+        opciones = opcionesBD.map((opcion, index) => {
+          const letra = String.fromCharCode(65 + index);
+          return {
+            inciso: letra,
+            texto: opcion.respuesta_opcion || '',
+            id: `${pregunta.numero_preg}-${letra}`,
+            inciso_original: letra,
+            inciso_bd: opcion.inciso
+          };
+        });
+        
+        console.log(`✅ Opciones múltiple para pregunta ${pregunta.numero_preg}:`, 
+          opciones.map(op => `${op.inciso} (BD:${op.inciso_bd}): ${op.texto.substring(0, 30)}...`)
+        );
+      } else {
+        opciones = [
+          { inciso: 'A', texto: 'Opción A', id: `${pregunta.numero_preg}-A`, inciso_original: 'A' },
+          { inciso: 'B', texto: 'Opción B', id: `${pregunta.numero_preg}-B`, inciso_original: 'B' },
+          { inciso: 'C', texto: 'Opción C', id: `${pregunta.numero_preg}-C`, inciso_original: 'C' },
+          { inciso: 'D', texto: 'Opción D', id: `${pregunta.numero_preg}-D`, inciso_original: 'D' }
+        ];
+      }
     }
-  }
 
-  return mezclarOpciones(opciones);
-};
+    return mezclarOpciones(opciones);
+  };
+
   // Mezclar opciones para que no aparezcan en orden
   const mezclarOpciones = (opciones) => {
     if (!opciones || opciones.length === 0) return [];
@@ -160,101 +348,236 @@ const crearOpcionesParaPregunta = async (pregunta, tipoPregunta) => {
   };
 
   const actualizarRespuesta = (index, campo, valor) => {
-  setRespuestas(prev => ({
-    ...prev,
-    [index]: {
-      ...prev[index],
-      [campo]: valor
-    }
-  }));
-};
+    setRespuestas(prev => ({
+      ...prev,
+      [index]: {
+        ...prev[index],
+        [campo]: valor
+      }
+    }));
+  };
 
-  
-
-// FUNCIÓN COMPLETAMENTE CORREGIDA: Comparar respuestas
 const compararRespuestasConCorrectas = (preguntasArray, respuestasObj) => {
   const resultados = {};
   let puntajeTotal = 0;
   let correctas = 0;
 
-  console.log('🚨 INICIANDO COMPARACIÓN CORREGIDA');
+  console.log('🚨 INICIANDO COMPARACIÓN CORREGIDA - VERSIÓN 1=VERDADERO, 2=FALSO');
+  console.log('📊 PREGUNTAS:', JSON.stringify(preguntasArray, null, 2));
+  console.log('📊 RESPUESTAS:', JSON.stringify(respuestasObj, null, 2));
 
   preguntasArray.forEach((pregunta, index) => {
-    const respuesta = respuestasObj[index];
+    const respuesta = respuestasObj[index] || {};
     let esCorrecta = false;
     let notaObtenida = 0;
     let necesitaRevision = false;
     
-    // 🎯 DEFINIR la variable aquí para evitar errores
-    let respuestaCorrectaComparar = pregunta.inciso_correcto;
+    // 🎯 OBTENER las respuestas SIN normalizar aún
+    const respuestaEstudianteRaw = respuesta.inciso_seleccionado;
+    const respuestaCorrectaRaw = pregunta.inciso_correcto;
 
-    console.log(`🔍 Procesando pregunta ${pregunta.numero_preg}:`, {
-      tipo: pregunta.tipo,
-      respuestaEstudiante: respuesta.inciso_seleccionado,
-      respuestaCorrectaBD: pregunta.inciso_correcto
-    });
+    console.log(`\n🔍🔍🔍 PROCESANDO PREGUNTA ${pregunta.numero_preg} (Índice: ${index})`);
+    console.log(`📋 TIPO: ${pregunta.tipo}`);
+    console.log(`📝 RESPUESTA ESTUDIANTE RAW: "${respuestaEstudianteRaw}" (tipo: ${typeof respuestaEstudianteRaw})`);
+    console.log(`📝 RESPUESTA CORRECTA RAW: "${respuestaCorrectaRaw}" (tipo: ${typeof respuestaCorrectaRaw})`);
 
-    if (pregunta.tipo === 'verdadero_falso' && respuesta.inciso_seleccionado) {
-      // 🎯 PARA V/F: Convertir A/B a V/F si es necesario
-      
-      // Si la respuesta correcta en BD está como A/B, convertir a V/F
-      if (pregunta.inciso_correcto === 'A' || pregunta.inciso_correcto === 'B') {
-        const mapeoABaVF = { 'A': 'V', 'B': 'F' };
-        respuestaCorrectaComparar = mapeoABaVF[pregunta.inciso_correcto] || pregunta.inciso_correcto;
-        console.log(`🔄 V/F Convertido: ${pregunta.inciso_correcto} -> ${respuestaCorrectaComparar}`);
+    // 🎯 FUNCIÓN MEJORADA PARA NORMALIZAR RESPUESTAS V/F
+    // ESPECIALMENTE PARA: 1->V, 2->F
+    const normalizarRespuestaVerdaderoFalso = (valor) => {
+      if (valor === null || valor === undefined || valor === '') {
+        return '';
       }
       
-      esCorrecta = respuesta.inciso_seleccionado === respuestaCorrectaComparar;
-      notaObtenida = esCorrecta ? (parseFloat(pregunta.nota_pregunta) || 1) : 0;
+      // Convertir a string y limpiar
+      let strValor = valor.toString().trim().toUpperCase();
       
-      console.log(`✅ V/F: "${respuesta.inciso_seleccionado}" vs "${respuestaCorrectaComparar}" = ${esCorrecta}`);
+      console.log(`   🔄 Normalizando V/F: "${valor}" -> "${strValor}"`);
       
-    } else if (pregunta.tipo === 'opcion_multiple' && respuesta.inciso_seleccionado) {
-      // 🎯 PARA OPCIÓN MÚLTIPLE: Convertir números a letras si es necesario
-      
-      if (pregunta.inciso_correcto && !isNaN(pregunta.inciso_correcto)) {
-        const mapeoNumerosALetras = { '1': 'A', '2': 'B', '3': 'C', '4': 'D' };
-        respuestaCorrectaComparar = mapeoNumerosALetras[pregunta.inciso_correcto] || pregunta.inciso_correcto;
-        console.log(`🔄 MULTIPLE Convertido: ${pregunta.inciso_correcto} -> ${respuestaCorrectaComparar}`);
+      // 🎯 ESPECIAL: 1 = VERDADERO, 2 = FALSO
+      if (strValor === '1') {
+        console.log(`   🔢 1 → VERDADERO (V)`);
+        return 'V';
+      }
+      if (strValor === '2') {
+        console.log(`   🔢 2 → FALSO (F)`);
+        return 'F';
       }
       
-      esCorrecta = respuesta.inciso_seleccionado === respuestaCorrectaComparar;
-      notaObtenida = esCorrecta ? (parseFloat(pregunta.nota_pregunta) || 1) : 0;
-
-      console.log(`🔘 MULTIPLE: "${respuesta.inciso_seleccionado}" vs "${respuestaCorrectaComparar}" = ${esCorrecta}`);
+      // Mapeo exhaustivo para VERDADERO
+      if (strValor === 'V' || strValor === 'A' || strValor === 'VERDADERO' || 
+          strValor === 'TRUE' || strValor === 'SÍ' || strValor === 'SI' || 
+          strValor === 'YES' || strValor === 'T' || strValor === 'V') {
+        console.log(`   ✅ Convertido a VERDADERO (V)`);
+        return 'V';
+      }
       
-    } else if (pregunta.tipo === 'desarrollo' && respuesta.respuesta_desarrollo) {
-      necesitaRevision = true;
-      console.log(`📝 Desarrollo: Necesita revisión`);
+      // Mapeo exhaustivo para FALSO
+      if (strValor === 'F' || strValor === 'B' || strValor === 'FALSO' || 
+          strValor === 'FALSE' || strValor === '0' || strValor === 'NO' || 
+          strValor === 'N' || strValor === 'FALSE') {
+        console.log(`   ✅ Convertido a FALSO (F)`);
+        return 'F';
+      }
+      
+      console.log(`   ⚠️ No se pudo normalizar: "${strValor}"`);
+      return strValor;
+    };
+
+    const normalizarRespuestaMultiple = (valor) => {
+      if (valor === null || valor === undefined || valor === '') {
+        return '';
+      }
+      
+      let strValor = valor.toString().trim().toUpperCase();
+      
+      console.log(`   🔄 Normalizando múltiple: "${valor}" -> "${strValor}"`);
+      
+      // Mapeo de números a letras
+      const mapeoNumeros = {
+        '1': 'A', '2': 'B', '3': 'C', '4': 'D',
+        '5': 'E', '6': 'F', '7': 'G', '8': 'H'
+      };
+      
+      if (mapeoNumeros[strValor]) {
+        console.log(`   🔢 Convertido número: "${strValor}" -> "${mapeoNumeros[strValor]}"`);
+        return mapeoNumeros[strValor];
+      }
+      
+      // Si ya es letra A-H, dejarla
+      if (/^[A-H]$/.test(strValor)) {
+        return strValor;
+      }
+      
+      return strValor;
+    };
+
+    // 🎯 FUNCIÓN ESPECIAL PARA COMPARAR V/F CON 1/2
+    const compararVerdaderoFalsoConNumeros = (estudiante, correcta) => {
+      console.log(`   🧮 Comparación especial V/F con números:`);
+      console.log(`      Estudiante: "${estudiante}"`);
+      console.log(`      Correcta: "${correcta}"`);
+      
+      // Si ambos son números, convertir a V/F primero
+      if (!isNaN(estudiante) && !isNaN(correcta)) {
+        const estudianteVF = estudiante === '1' ? 'V' : (estudiante === '2' ? 'F' : estudiante);
+        const correctaVF = correcta === '1' ? 'V' : (correcta === '2' ? 'F' : correcta);
+        console.log(`      Estudiante ${estudiante} → ${estudianteVF}`);
+        console.log(`      Correcta ${correcta} → ${correctaVF}`);
+        return estudianteVF === correctaVF;
+      }
+      
+      // Si solo la correcta es número
+      if (!isNaN(correcta)) {
+        const correctaVF = correcta === '1' ? 'V' : (correcta === '2' ? 'F' : correcta);
+        console.log(`      Correcta ${correcta} → ${correctaVF}`);
+        return estudiante === correctaVF;
+      }
+      
+      // Si solo el estudiante es número
+      if (!isNaN(estudiante)) {
+        const estudianteVF = estudiante === '1' ? 'V' : (estudiante === '2' ? 'F' : estudiante);
+        console.log(`      Estudiante ${estudiante} → ${estudianteVF}`);
+        return estudianteVF === correcta;
+      }
+      
+      // Caso normal
+      return estudiante === correcta;
+    };
+
+    // NORMALIZAR según tipo
+    let respuestaEstudianteNormalizada = '';
+    let respuestaCorrectaNormalizada = '';
+
+    if (pregunta.tipo === 'verdadero_falso') {
+      // Primero normalizamos
+      respuestaEstudianteNormalizada = normalizarRespuestaVerdaderoFalso(respuestaEstudianteRaw);
+      respuestaCorrectaNormalizada = normalizarRespuestaVerdaderoFalso(respuestaCorrectaRaw);
+      
+      console.log(`🔄 RESULTADO NORMALIZACIÓN V/F:`);
+      console.log(`   Estudiante: "${respuestaEstudianteRaw}" -> "${respuestaEstudianteNormalizada}"`);
+      console.log(`   Correcta:   "${respuestaCorrectaRaw}" -> "${respuestaCorrectaNormalizada}"`);
+      
+      // COMPARACIÓN V/F
+      if (respuestaEstudianteNormalizada) {
+        // Usar comparación especial que entiende 1/2
+        esCorrecta = compararVerdaderoFalsoConNumeros(
+          respuestaEstudianteNormalizada, 
+          respuestaCorrectaNormalizada
+        );
+        
+        notaObtenida = esCorrecta ? (parseFloat(pregunta.nota_pregunta) || 1) : 0;
+        
+        console.log(`✅✅✅ COMPARACIÓN V/F FINAL:`);
+        console.log(`   "${respuestaEstudianteNormalizada}" vs "${respuestaCorrectaNormalizada}"`);
+        console.log(`   RESULTADO: ${esCorrecta ? '✅ CORRECTA' : '❌ INCORRECTA'}`);
+      } else {
+        console.log(`⚠️ V/F: El estudiante no respondió`);
+      }
+      
+    } else if (pregunta.tipo === 'opcion_multiple') {
+      respuestaEstudianteNormalizada = normalizarRespuestaMultiple(respuestaEstudianteRaw);
+      respuestaCorrectaNormalizada = normalizarRespuestaMultiple(respuestaCorrectaRaw);
+      
+      console.log(`🔄 RESULTADO NORMALIZACIÓN MULTIPLE:`);
+      console.log(`   Estudiante: "${respuestaEstudianteRaw}" -> "${respuestaEstudianteNormalizada}"`);
+      console.log(`   Correcta:   "${respuestaCorrectaRaw}" -> "${respuestaCorrectaNormalizada}"`);
+      
+      // COMPARACIÓN MÚLTIPLE
+      if (respuestaEstudianteNormalizada) {
+        esCorrecta = respuestaEstudianteNormalizada === respuestaCorrectaNormalizada;
+        notaObtenida = esCorrecta ? (parseFloat(pregunta.nota_pregunta) || 1) : 0;
+
+        console.log(`🔘🔘🔘 COMPARACIÓN MULTIPLE FINAL:`);
+        console.log(`   "${respuestaEstudianteNormalizada}" vs "${respuestaCorrectaNormalizada}"`);
+        console.log(`   RESULTADO: ${esCorrecta ? '✅ CORRECTA' : '❌ INCORRECTA'}`);
+      } else {
+        console.log(`⚠️ MULTIPLE: El estudiante no respondió`);
+      }
+      
+    } else if (pregunta.tipo === 'desarrollo') {
+      if (respuesta.respuesta_desarrollo) {
+        necesitaRevision = true;
+        notaObtenida = 0;
+        console.log(`📝 Desarrollo: Necesita revisión manual`);
+      } else {
+        console.log(`📝 Desarrollo: Sin respuesta`);
+      }
     } else {
-      // Para otros casos (sin respuesta o tipo desconocido)
-      console.log(`❓ Caso no manejado: tipo=${pregunta.tipo}, respuesta=${respuesta.inciso_seleccionado}`);
+      console.log(`❓ Tipo no manejado: ${pregunta.tipo}`);
     }
 
+    // ACTUALIZAR ESTADÍSTICAS
     if (esCorrecta) correctas++;
     puntajeTotal += notaObtenida;
 
+    // GUARDAR RESULTADO
     resultados[index] = {
       ...respuesta,
       es_correcta: esCorrecta,
       nota_obtenida: notaObtenida,
-      necesita_revision: necesitaRevision
+      necesita_revision: necesitaRevision,
+      respuesta_estudiante_normalizada: respuestaEstudianteNormalizada,
+      respuesta_correcta_normalizada: respuestaCorrectaNormalizada,
+      // Información adicional para debugging
+      _debug: {
+        raw_estudiante: respuestaEstudianteRaw,
+        raw_correcta: respuestaCorrectaRaw,
+        tipo: pregunta.tipo
+      }
     };
 
-    // DEBUG FINAL POR PREGUNTA
-    console.log(`📝 RESULTADO PREGUNTA ${pregunta.numero_preg}:`, {
-      es_correcta: esCorrecta,
-      nota_obtenida: notaObtenida,
-      comparacion: `${respuesta.inciso_seleccionado} vs ${respuestaCorrectaComparar}`
-    });
+    console.log(`📝📝📝 RESULTADO FINAL PREG ${pregunta.numero_preg}: ${esCorrecta ? '✅' : '❌'}`);
+    console.log('---'.repeat(20));
   });
 
-  console.log('📊 RESULTADOS FINALES:', { 
-    correctas, 
-    total: preguntasArray.length, 
-    puntajeTotal,
-    porcentaje: preguntasArray.length > 0 ? (correctas / preguntasArray.length) * 100 : 0 
-  });
+  // 🎯 ESTADÍSTICAS FINALES
+  const porcentaje = preguntasArray.length > 0 ? (correctas / preguntasArray.length) * 100 : 0;
+  
+  console.log('\n📊📊📊 ========== ESTADÍSTICAS FINALES ==========');
+  console.log(`✅ Correctas: ${correctas} de ${preguntasArray.length}`);
+  console.log(`🏆 Puntaje total: ${puntajeTotal}`);
+  console.log(`📈 Porcentaje: ${porcentaje.toFixed(2)}%`);
+  console.log('==============================================\n');
   
   return { 
     resultados, 
@@ -262,124 +585,153 @@ const compararRespuestasConCorrectas = (preguntasArray, respuestasObj) => {
       correctas, 
       total: preguntasArray.length, 
       puntajeTotal,
-      porcentaje: preguntasArray.length > 0 ? (correctas / preguntasArray.length) * 100 : 0 
+      porcentaje 
     } 
   };
 };
-const enviarRespuestas = async () => {
-  if (enviando) return;
 
-  console.log('🚨🚨🚨 DEBUG CRÍTICO - VERIFICANDO SI SE EJECUTA COMPARACIÓN 🚨🚨🚨');
+// 🧪 FUNCIÓN DE PRUEBA ESPECÍFICA PARA 1=V, 2=F
+const probarCasosConNumeros = () => {
+  console.log('🧪🧪🧪 PRUEBA ESPECIAL: 1=VERDADERO, 2=FALSO 🧪🧪🧪\n');
   
-  // VERIFICAR SI LA FUNCIÓN compararRespuestasConCorrectas EXISTE
-  console.log('¿Existe compararRespuestasConCorrectas?', typeof compararRespuestasConCorrectas);
-  
-  // VERIFICAR DATOS DE ENTRADA
-  console.log('📋 PREGUNTAS:', preguntas);
-  console.log('📋 RESPUESTAS:', respuestas);
-  
-  const preguntasSinResponder = Object.values(respuestas).filter(r => 
-    !r.inciso_seleccionado && !r.respuesta_desarrollo
-  ).length;
-  
-  if (preguntasSinResponder > 0) {
-    if (!window.confirm(`Tienes ${preguntasSinResponder} pregunta(s) sin responder. ¿Deseas enviar de todas formas?`)) {
-      return;
-    }
-  }
-
-  try {
-    setEnviando(true);
-    const token = getToken();
-
-    // 🚨 FORZAR LA EJECUCIÓN Y CAPTURAR ERRORES
-    console.log('🔍 EJECUTANDO compararRespuestasConCorrectas...');
-    let respuestasConNota, estadisticas;
+  const casosPrueba = [
+    // CASOS donde la CORRECTA está como número
+    { correcta: '1', estudiante: 'V', esperado: true, desc: 'Correcta=1(V), Est=V' },
+    { correcta: '1', estudiante: '1', esperado: true, desc: 'Correcta=1(V), Est=1' },
+    { correcta: '1', estudiante: 'VERDADERO', esperado: true, desc: 'Correcta=1(V), Est=VERDADERO' },
+    { correcta: '1', estudiante: 'A', esperado: true, desc: 'Correcta=1(V), Est=A' },
     
-    try {
-      const resultado = compararRespuestasConCorrectas(preguntas, respuestas);
-      respuestasConNota = resultado.resultados;
-      estadisticas = resultado.estadisticas;
-      console.log('✅ compararRespuestasConCorrectas EJECUTADA EXITOSAMENTE');
-    } catch (error) {
-      console.error('❌ ERROR en compararRespuestasConCorrectas:', error);
-      // Si falla, usar respuestas originales
-      respuestasConNota = respuestas;
-      estadisticas = { correctas: 0, total: preguntas.length, puntajeTotal: 0, porcentaje: 0 };
+    { correcta: '2', estudiante: 'F', esperado: true, desc: 'Correcta=2(F), Est=F' },
+    { correcta: '2', estudiante: '2', esperado: true, desc: 'Correcta=2(F), Est=2' },
+    { correcta: '2', estudiante: 'FALSO', esperado: true, desc: 'Correcta=2(F), Est=FALSO' },
+    { correcta: '2', estudiante: 'B', esperado: true, desc: 'Correcta=2(F), Est=B' },
+    
+    // CASOS donde el ESTUDIANTE responde con número
+    { correcta: 'V', estudiante: '1', esperado: true, desc: 'Correcta=V, Est=1(V)' },
+    { correcta: 'F', estudiante: '2', esperado: true, desc: 'Correcta=F, Est=2(F)' },
+    { correcta: 'A', estudiante: '1', esperado: true, desc: 'Correcta=A(V), Est=1(V)' },
+    { correcta: 'B', estudiante: '2', esperado: true, desc: 'Correcta=B(F), Est=2(F)' },
+    
+    // CASOS INCORRECTOS
+    { correcta: '1', estudiante: 'F', esperado: false, desc: 'Correcta=1(V), Est=F (INCORRECTO)' },
+    { correcta: '2', estudiante: 'V', esperado: false, desc: 'Correcta=2(F), Est=V (INCORRECTO)' },
+    { correcta: '1', estudiante: '2', esperado: false, desc: 'Correcta=1(V), Est=2(F) (INCORRECTO)' },
+    { correcta: '2', estudiante: '1', esperado: false, desc: 'Correcta=2(F), Est=1(V) (INCORRECTO)' },
+    
+    // CASOS con VERDADERO/FALSO en texto
+    { correcta: 'VERDADERO', estudiante: '1', esperado: true, desc: 'Correcta=VERDADERO, Est=1(V)' },
+    { correcta: 'FALSO', estudiante: '2', esperado: true, desc: 'Correcta=FALSO, Est=2(F)' },
+  ];
+
+  let aciertos = 0;
+  casosPrueba.forEach((caso, i) => {
+    const preguntasTest = [{
+      numero_preg: i + 1,
+      tipo: 'verdadero_falso',
+      inciso_correcto: caso.correcta,
+      nota_pregunta: '1'
+    }];
+
+    const respuestasTest = {
+      0: { inciso_seleccionado: caso.estudiante }
+    };
+
+    console.log(`🧪 CASO ${i + 1}: ${caso.desc}`);
+    
+    const resultado = compararRespuestasConCorrectas(preguntasTest, respuestasTest);
+    const esCorrecto = resultado.estadisticas.correctas === (caso.esperado ? 1 : 0);
+    
+    if (esCorrecto) aciertos++;
+    
+    console.log(`   ${esCorrecto ? '✅' : '❌'} Resultado: ${resultado.estadisticas.correctas === 1 ? 'Correcto' : 'Incorrecto'} (Esperado: ${caso.esperado ? 'Correcto' : 'Incorrecto'})`);
+    console.log('---'.repeat(10));
+  });
+
+  console.log(`\n📊 RESULTADO PRUEBAS: ${aciertos}/${casosPrueba.length} correctos (${((aciertos/casosPrueba.length)*100).toFixed(1)}%)`);
+};
+
+  const enviarRespuestas = async () => {
+    if (enviando) return;
+
+    const preguntasSinResponder = Object.values(respuestas).filter(r => 
+      !r.inciso_seleccionado && !r.respuesta_desarrollo
+    ).length;
+    
+    if (preguntasSinResponder > 0) {
+      if (!window.confirm(`Tienes ${preguntasSinResponder} pregunta(s) sin responder. ¿Deseas enviar de todas formas?`)) {
+        return;
+      }
     }
 
-    // 🚨 VERIFICAR RESULTADOS DE LA COMPARACIÓN
-    console.log('📊 RESULTADOS DE COMPARACIÓN:');
-    Object.values(respuestasConNota).forEach((resp, idx) => {
-      const preg = preguntas[idx];
-      console.log(`Pregunta ${resp.numero_preg}:`, {
-        respuesta: resp.inciso_seleccionado,
-        correctaBD: preg?.inciso_correcto,
-        es_correcta: resp.es_correcta,
-        nota_obtenida: resp.nota_obtenida
-      });
-    });
+    try {
+      setEnviando(true);
+      const token = getToken();
 
-    setRespuestas(respuestasConNota);
-
-    // Enviar respuestas de forma secuencial
-    const resultados = [];
-    const errores = [];
-
-    for (const [index, respuesta] of Object.entries(respuestasConNota)) {
-      const payload = {
-        id_inscripcion: parseInt(inscripcionId),
-        numero_preg: respuesta.numero_preg,
-        inciso_seleccionado: respuesta.inciso_seleccionado,
-        respuesta_desarrollo: respuesta.respuesta_desarrollo,
-        es_correcta: respuesta.es_correcta,
-        nota_obtenida: respuesta.nota_obtenida,
-        fecha_respuesta: new Date().toISOString()
-      };
-
-      console.log(`📨 Enviando pregunta ${respuesta.numero_preg}:`, payload);
-
+      let respuestasConNota, estadisticas;
+      
       try {
-        const response = await fetch('http://localhost:3000/respuestas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
+        const resultado = compararRespuestasConCorrectas(preguntas, respuestas);
+        respuestasConNota = resultado.resultados;
+        estadisticas = resultado.estadisticas;
+      } catch (error) {
+        console.error('❌ ERROR en compararRespuestasConCorrectas:', error);
+        respuestasConNota = respuestas;
+        estadisticas = { correctas: 0, total: preguntas.length, puntajeTotal: 0, porcentaje: 0 };
+      }
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`HTTP ${response.status}: ${errorData.error || 'Error desconocido'}`);
+      setRespuestas(respuestasConNota);
+
+      const resultados = [];
+      const errores = [];
+
+      for (const [index, respuesta] of Object.entries(respuestasConNota)) {
+        const payload = {
+          id_inscripcion: parseInt(inscripcionId),
+          numero_preg: respuesta.numero_preg,
+          inciso_seleccionado: respuesta.inciso_seleccionado,
+          respuesta_desarrollo: respuesta.respuesta_desarrollo,
+          es_correcta: respuesta.es_correcta,
+          nota_obtenida: respuesta.nota_obtenida,
+          fecha_respuesta: new Date().toISOString()
+        };
+
+        try {
+          const response = await fetch('http://localhost:3000/respuestas', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`HTTP ${response.status}: ${errorData.error || 'Error desconocido'}`);
+          }
+          
+          const result = await response.json();
+          resultados.push({ success: true, numero_preg: respuesta.numero_preg, data: result });
+        } catch (error) {
+          console.error(`❌ Error en pregunta ${respuesta.numero_preg}:`, error.message);
+          errores.push({ 
+            error: error.message, 
+            numero_preg: respuesta.numero_preg,
+            pregunta: index 
+          });
         }
         
-        const result = await response.json();
-        console.log(`✅ Pregunta ${respuesta.numero_preg} enviada:`, result);
-        resultados.push({ success: true, numero_preg: respuesta.numero_preg, data: result });
-      } catch (error) {
-        console.error(`❌ Error en pregunta ${respuesta.numero_preg}:`, error.message);
-        errores.push({ 
-          error: error.message, 
-          numero_preg: respuesta.numero_preg,
-          pregunta: index 
-        });
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
 
-    console.log('📊 Resultados del envío:', { resultados, errores });
+      const exitosas = resultados.filter(r => r.success);
+      const totalPreguntas = preguntas.length;
+      const puntajeTotal = preguntas.reduce((sum, p) => sum + (parseFloat(p.nota_pregunta) || 1), 0);
+      const puntajeObtenido = Object.values(respuestasConNota).reduce((sum, r) => sum + (r.nota_obtenida || 0), 0);
+      const preguntasDesarrollo = preguntas.filter(p => p.tipo === 'desarrollo').length;
+      const preguntasParaRevisar = Object.values(respuestasConNota).filter(r => r.necesita_revision).length;
 
-    const exitosas = resultados.filter(r => r.success);
-    const totalPreguntas = preguntas.length;
-    const puntajeTotal = preguntas.reduce((sum, p) => sum + (parseFloat(p.nota_pregunta) || 1), 0);
-    const puntajeObtenido = Object.values(respuestasConNota).reduce((sum, r) => sum + (r.nota_obtenida || 0), 0);
-    const preguntasDesarrollo = preguntas.filter(p => p.tipo === 'desarrollo').length;
-    const preguntasParaRevisar = Object.values(respuestasConNota).filter(r => r.necesita_revision).length;
-
-    // Mostrar resumen
-    let mensaje = `
+      let mensaje = `
 ¡Evaluación procesada! 🎉
 
 📊 **RESULTADOS AUTOMÁTICOS:**
@@ -393,34 +745,34 @@ const enviarRespuestas = async () => {
 • Respuestas guardadas: ${exitosas.length}/${totalPreguntas}
 `;
 
-    if (errores.length > 0) {
-      mensaje += `• Errores: ${errores.length} pregunta(s)\n`;
-      mensaje += `• Preguntas con error: ${errores.map(e => e.numero_preg).join(', ')}\n\n`;
-      mensaje += `⚠️ Las preguntas con error se guardarán localmente.`;
-    } else {
-      mensaje += `• ✅ Todas las respuestas guardadas correctamente\n\n`;
-      mensaje += `📬 **PRÓXIMOS PASOS:**\n`;
-      mensaje += `El docente revisará tus respuestas de desarrollo y completará la calificación final.`;
-    }
-
-    alert(mensaje.trim());
-
-    if (exitosas.length >= totalPreguntas * 0.8) {
-      if (onFinalizar) {
-        onFinalizar();
+      if (errores.length > 0) {
+        mensaje += `• Errores: ${errores.length} pregunta(s)\n`;
+        mensaje += `• Preguntas con error: ${errores.map(e => e.numero_preg).join(', ')}\n\n`;
+        mensaje += `⚠️ Las preguntas con error se guardarán localmente.`;
+      } else {
+        mensaje += `• ✅ Todas las respuestas guardadas correctamente\n\n`;
+        mensaje += `📬 **PRÓXIMOS PASOS:**\n`;
+        mensaje += `El docente revisará tus respuestas de desarrollo y completará la calificación final.`;
       }
+
+      alert(mensaje.trim());
+
+      if (exitosas.length >= totalPreguntas * 0.8) {
+        if (onFinalizar) {
+          onFinalizar();
+        }
+      }
+
+    } catch (err) {
+      console.error('❌ Error general al enviar respuestas:', err);
+      setError('Error al enviar respuestas: ' + err.message);
+      alert(`❌ Error crítico al enviar la evaluación:\n\n${err.message}`);
+    } finally {
+      setEnviando(false);
     }
+  };
 
-  } catch (err) {
-    console.error('❌ Error general al enviar respuestas:', err);
-    setError('Error al enviar respuestas: ' + err.message);
-    alert(`❌ Error crítico al enviar la evaluación:\n\n${err.message}`);
-  } finally {
-    setEnviando(false);
-  }
-};
-
-  // Cargar preguntas de la evaluación (VERSIÓN MEJORADA)
+  // Cargar preguntas de la evaluación
   const cargarPreguntas = useCallback(async () => {
     try {
       setLoading(true);
@@ -431,33 +783,13 @@ const enviarRespuestas = async () => {
 
       if (response.ok) {
         const preguntasData = await response.json();
-        console.log("📋 Preguntas cargadas:", preguntasData);
         
-        // Filtrar solo las preguntas activas
         const preguntasActivas = preguntasData.filter(p => p.activo);
-        console.log("✅ Preguntas activas:", preguntasActivas);
 
-        // Procesar cada pregunta y cargar sus opciones
-        // En la función cargarPreguntas, después de procesar las preguntas, agrega:
         const preguntasConOpciones = await Promise.all(
           preguntasActivas.map(async (pregunta) => {
             const tipoPregunta = determinarTipoPregunta(pregunta);
             const opciones = await crearOpcionesParaPregunta(pregunta, tipoPregunta);
-
-            // DEBUG ESPECÍFICO PARA PREGUNTA 35
-            if (pregunta.numero_preg === 35) {
-              console.log('🔍🔍🔍 PREGUNTA 35 CARGADA DESDE BD 🔍🔍🔍');
-              console.log('📋 DATOS ORIGINALES BD:', {
-                numero_preg: pregunta.numero_preg,
-                descripcion: pregunta.descripcion,
-                tipo_pregun: pregunta.tipo_pregun,
-                tipo_determinado: tipoPregunta,
-                inciso_correcto: pregunta.inciso_correcto,
-                nota_pregunta: pregunta.nota_pregunta,
-                opciones_generadas: opciones
-              });
-              console.log('🎯 RESPUESTA CORRECTA ESPERADA: B (Falso)');
-            }
 
             return {
               ...pregunta,
@@ -467,15 +799,8 @@ const enviarRespuestas = async () => {
           })
         );
 
-        // DEBUG FINAL DE TODAS LAS PREGUNTAS CARGADAS
-        console.log('📦 TODAS LAS PREGUNTAS CARGADAS:');
-        preguntasConOpciones.forEach((p, idx) => {
-          console.log(`Pregunta ${p.numero_preg}: ${p.descripcion?.substring(0, 30)}... | Tipo: ${p.tipo} | Correcta: ${p.inciso_correcto}`);
-        });
-
         setPreguntas(preguntasConOpciones);
         
-        // Inicializar respuestas vacías
         const respuestasIniciales = {};
         preguntasConOpciones.forEach((pregunta, index) => {
           respuestasIniciales[index] = {
@@ -489,7 +814,6 @@ const enviarRespuestas = async () => {
         });
         setRespuestas(respuestasIniciales);
         
-        console.log("🎯 Preguntas procesadas:", preguntasConOpciones);
       } else {
         throw new Error('Error al cargar preguntas');
       }
@@ -501,8 +825,21 @@ const enviarRespuestas = async () => {
     }
   }, [evaluacion.id_evaluacion, getToken]);
 
-  // Manejar selección de respuesta para opción múltiple y V/F
-  const handleSeleccionOpcion = (indexPregunta, inciso) => {
+  // FUNCIÓN CORREGIDA: Manejar cambio de respuesta para desarrollo
+  const handleRespuestaDesarrollo = useCallback((indexPregunta, valor) => {
+    setRespuestas(prev => ({
+      ...prev,
+      [indexPregunta]: {
+        ...prev[indexPregunta],
+        respuesta_desarrollo: valor,
+        inciso_seleccionado: null,
+        necesita_revision: true
+      }
+    }));
+  }, []);
+
+  // FUNCIÓN CORREGIDA: Manejar selección de respuesta para opción múltiple y V/F
+  const handleSeleccionOpcion = useCallback((indexPregunta, inciso) => {
     setRespuestas(prev => ({
       ...prev,
       [indexPregunta]: {
@@ -511,23 +848,7 @@ const enviarRespuestas = async () => {
         respuesta_desarrollo: null
       }
     }));
-  };
-
-  // Manejar cambio de respuesta para desarrollo
-const handleRespuestaDesarrollo = (pregunta, valor) => {
-  setRespuestas(prev => ({
-    ...prev,
-    [pregunta.numero_preg]: {
-      numero_preg: pregunta.numero_preg,
-      tipo: 'desarrollo',
-      respuesta_desarrollo: valor,
-      es_correcta: null,
-      nota_obtenida: 0,
-      necesita_revision: true
-    }
-  }));
-};
-
+  }, []);
 
   // Contador de tiempo
   useEffect(() => {
@@ -562,193 +883,6 @@ const handleRespuestaDesarrollo = (pregunta, valor) => {
       cargarPreguntas();
     }
   }, [evaluacion, inscripcionId, cargarPreguntas]);
-
-
-  // Componente para pregunta de Verdadero/Falso
-  const PreguntaVerdaderoFalso = ({ pregunta, index, respuesta }) => (
-    <div className="space-y-6">
-      {/* Enunciado */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
-        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
-          {pregunta.descripcion || pregunta.enunciado}
-        </p>
-        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
-          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
-            {pregunta.enunciado}
-          </p>
-        )}
-      </div>
-
-      {/* Opciones V/F con diseño mejorado */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {pregunta.opciones && pregunta.opciones.map((opcion) => (
-          <label 
-            key={opcion.id}
-            className={`relative flex items-center justify-center p-6 rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 ${
-              respuesta?.inciso_seleccionado === opcion.inciso
-                ? opcion.inciso === 'V' 
-                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 shadow-lg'
-                  : 'border-rose-500 bg-rose-50 dark:bg-rose-900/20 shadow-lg'
-                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
-            }`}
-          >
-            <input
-              type="radio"
-              name={`pregunta-${index}`}
-              value={opcion.inciso}
-              checked={respuesta?.inciso_seleccionado === opcion.inciso}
-              onChange={() => handleSeleccionOpcion(index, opcion.inciso)}
-              className="sr-only"
-            />
-            <div className="text-center">
-              <div className={`text-4xl font-bold mb-2 ${
-                opcion.inciso === 'V' 
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-rose-600 dark:text-rose-400'
-              }`}>
-                {opcion.inciso}
-              </div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {opcion.texto}
-              </div>
-            </div>
-            
-            {/* Indicador de selección */}
-            {respuesta?.inciso_seleccionado === opcion.inciso && (
-              <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-            )}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Componente para pregunta de opción múltiple
-  const PreguntaOpcionMultiple = ({ pregunta, index, respuesta }) => (
-    <div className="space-y-6">
-      {/* Enunciado */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl p-6 border border-purple-200 dark:border-purple-800">
-        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
-          {pregunta.descripcion || pregunta.enunciado}
-        </p>
-        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
-          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
-            {pregunta.enunciado}
-          </p>
-        )}
-      </div>
-
-      {/* Opciones con diseño de tarjetas - MEJORADO */}
-      <div className="grid grid-cols-1 gap-3">
-        {pregunta.opciones && pregunta.opciones.map((opcion) => (
-          <label 
-            key={opcion.id}
-            className={`relative flex items-start space-x-4 p-5 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${
-              respuesta?.inciso_seleccionado === opcion.inciso
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
-            }`}
-          >
-            <input
-              type="radio"
-              name={`pregunta-${index}`}
-              value={opcion.inciso}
-              checked={respuesta?.inciso_seleccionado === opcion.inciso}
-              onChange={() => handleSeleccionOpcion(index, opcion.inciso)}
-              className="mt-1 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start space-x-3">
-                <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded-full text-sm font-bold flex-shrink-0 mt-1">
-                  {opcion.inciso}
-                </span>
-                <div>
-                  <span className="text-lg font-medium text-gray-900 dark:text-white block">
-                    {/* MOSTRAR EL TEXTO COMPLETO CON EL FORMATO A) texto, B) texto */}
-                    <span className="font-bold">{opcion.inciso})</span> {opcion.texto}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {respuesta?.inciso_seleccionado === opcion.inciso && (
-              <div className="flex-shrink-0 text-green-500">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-            )}
-          </label>
-        ))}
-      </div>
-      
-      {/* Debug info - solo en desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            <strong>Debug:</strong> {pregunta.opciones?.length || 0} opciones cargadas para pregunta {pregunta.numero_preg}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-
-  // Componente para pregunta de desarrollo
-  const PreguntaDesarrollo = ({ pregunta, index, respuesta }) => (
-    <div className="space-y-6">
-      {/* Enunciado */}
-      <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-2xl p-6 border border-orange-200 dark:border-orange-800">
-        <p className="text-gray-800 dark:text-gray-200 text-xl leading-relaxed font-semibold">
-          {pregunta.descripcion || pregunta.enunciado}
-        </p>
-        {pregunta.descripcion && pregunta.enunciado && pregunta.enunciado !== pregunta.descripcion && (
-          <p className="text-gray-600 dark:text-gray-400 mt-3 text-base">
-            {pregunta.enunciado}
-          </p>
-        )}
-      </div>
-
-      {/* Área de texto para respuesta */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="block text-lg font-semibold text-gray-900 dark:text-white">
-            📝 Tu respuesta:
-          </label>
-          <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
-            {respuesta?.respuesta_desarrollo?.length || 0} caracteres
-          </span>
-        </div>
-        
-        <div className="relative">
-          <textarea
-            className="w-full p-3 border rounded-lg"
-            placeholder="Escribe tu respuesta..."
-            value={respuestas[pregunta.numero_preg]?.respuesta_desarrollo || ""}
-            onChange={(e) => handleRespuestaDesarrollo(pregunta, e.target.value)}
-          />
-
-        </div>
-        
-        {/* Consejos para desarrollo */}
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-bold">💡</span>
-            </div>
-            <div>
-              <p className="text-amber-800 dark:text-amber-300 text-sm font-medium">
-                Consejo: Sé claro y detallado en tu respuesta. Incluye ejemplos cuando sea posible.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -817,8 +951,6 @@ const handleRespuestaDesarrollo = (pregunta, valor) => {
           )}
         </div>
       </div>
-
-
 
       {/* Estadísticas rápidas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -917,18 +1049,21 @@ const handleRespuestaDesarrollo = (pregunta, valor) => {
                   pregunta={pregunta}
                   index={index}
                   respuesta={respuestas[index]}
+                  onChange={handleSeleccionOpcion}
                 />
               ) : pregunta.tipo === 'opcion_multiple' ? (
                 <PreguntaOpcionMultiple 
                   pregunta={pregunta}
                   index={index}
                   respuesta={respuestas[index]}
+                  onChange={handleSeleccionOpcion}
                 />
               ) : (
                 <PreguntaDesarrollo 
                   pregunta={pregunta}
                   index={index}
                   respuesta={respuestas[index]}
+                  onChange={handleRespuestaDesarrollo}
                 />
               )}
             </div>

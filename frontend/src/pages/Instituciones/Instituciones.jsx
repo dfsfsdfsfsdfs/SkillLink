@@ -658,40 +658,175 @@ const Instituciones = () => {
     }
   };
 
-  // Activar/desactivar institución (solo admin)
-  const toggleInstitucionEstado = async (idInstitucion, estadoActual) => {
-    try {
-      setUpdating(idInstitucion);
-      const token = getToken();
+// Activar/desactivar institución (solo admin) - VERSIÓN CON REACTIVACIÓN
+const toggleInstitucionEstado = async (idInstitucion, estadoActual) => {
+  try {
+    setUpdating(idInstitucion);
+    const token = getToken();
+    
+    // SI SE VA A DESACTIVAR
+    if (estadoActual) {
+      // Primero intentar sin desactivar dependencias
       const response = await fetch(`http://localhost:3000/instituciones/${idInstitucion}/estado`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ activo: !estadoActual })
+        body: JSON.stringify({ 
+          activo: false,
+          desactivar_dependencias: false 
+        })
       });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cambiar estado');
+        // Si hay error por dependencias, mostrar opciones
+        if (response.status === 400 && result.detalles?.necesita_confirmacion) {
+          const confirmar = window.confirm(
+            `⚠️ No se puede desactivar esta institución porque tiene:\n\n` +
+            `• ${result.detalles.aulas_activas} aula(s) activa(s)\n` +
+            `• ${result.detalles.tutorias_activas} tutoría(s) activa(s)\n\n` +
+            `¿Deseas desactivar la institución junto con todas sus aulas y tutorías?\n\n` +
+            `📌 Nota: Las aulas y tutorías solo se DESACTIVARÁN temporalmente.\n` +
+            `Podrás reactivarlas junto con la institución más tarde.`
+          );
+          
+          if (confirmar) {
+            // Intentar con desactivación de dependencias
+            const responseConDependencias = await fetch(`http://localhost:3000/instituciones/${idInstitucion}/estado`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ 
+                activo: false,
+                desactivar_dependencias: true 
+              })
+            });
+
+            if (!responseConDependencias.ok) {
+              const errorData = await responseConDependencias.json();
+              throw new Error(errorData.error || 'Error al desactivar con dependencias');
+            }
+
+            const resultConDependencias = await responseConDependencias.json();
+            
+            // Actualizar el estado local
+            setInstituciones(prev => 
+              prev.map(inst => 
+                inst.id_institucion === idInstitucion 
+                  ? { ...inst, activo: false }
+                  : inst
+              )
+            );
+            
+            setError(null);
+            
+            // Mostrar resumen
+            if (resultConDependencias.resumen) {
+              alert(
+                `✅ Institución desactivada correctamente.\n\n` +
+                `Resumen:\n` +
+                `• Instituciones desactivadas: 1\n` +
+                `• Aulas desactivadas: ${resultConDependencias.resumen.aulas_desactivadas}\n` +
+                `• Tutorías desactivadas: ${resultConDependencias.resumen.tutorias_desactivadas}\n\n` +
+                `📌 Todas las aulas y tutorías fueron DESACTIVADAS temporalmente.`
+              );
+            }
+            return;
+          } else {
+            throw new Error('Operación cancelada por el usuario');
+          }
+        }
+        throw new Error(result.error || 'Error al cambiar estado');
       }
 
-      const result = await response.json();
+      // Si no hubo dependencias, actualizar normalmente
       setInstituciones(prev => 
         prev.map(inst => 
           inst.id_institucion === idInstitucion 
-            ? { ...inst, activo: !estadoActual }
+            ? { ...inst, activo: false }
             : inst
         )
       );
       setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdating(null);
+      alert(`✅ Institución desactivada correctamente.`);
+    } 
+    // SI SE VA A ACTIVAR
+    else {
+      const confirmarReactivar = window.confirm(
+        `¿Deseas activar esta institución?\n\n` +
+        `Opciones:\n` +
+        `1. Solo activar la institución (las aulas/tutorías permanecerán desactivadas)\n` +
+        `2. Activar la institución y reactivar todas sus aulas y tutorías`
+      );
+      
+      if (confirmarReactivar) {
+        const reactivarDependencias = window.confirm(
+          `¿Deseas reactivar también todas las aulas y tutorías de esta institución?\n\n` +
+          `• "Cancelar": Solo activa la institución\n` +
+          `• "Aceptar": Activa la institución y todas sus aulas/tutorías`
+        );
+        
+        // Activar con o sin reactivación de dependencias
+        const response = await fetch(`http://localhost:3000/instituciones/${idInstitucion}/estado`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ 
+            activo: true,
+            reactivar_dependencias: reactivarDependencias
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al activar institución');
+        }
+
+        const result = await response.json();
+        
+        // Actualizar el estado local
+        setInstituciones(prev => 
+          prev.map(inst => 
+            inst.id_institucion === idInstitucion 
+              ? { ...inst, activo: true }
+              : inst
+          )
+        );
+        
+        setError(null);
+        
+        // Mostrar mensaje apropiado
+        if (reactivarDependencias && result.resumen) {
+          alert(
+            `✅ Institución activada correctamente.\n\n` +
+            `Resumen:\n` +
+            `• Instituciones activadas: 1\n` +
+            `• Aulas reactivadas: ${result.resumen.aulas_reactivadas}\n` +
+            `• Tutorías reactivadas: ${result.resumen.tutorias_reactivadas}`
+          );
+        } else {
+          alert(`✅ Institución activada correctamente.\n\n📌 Las aulas y tutorías permanecen desactivadas.`);
+        }
+      } else {
+        throw new Error('Operación cancelada por el usuario');
+      }
     }
-  };
+    
+  } catch (err) {
+    setError(err.message);
+    console.error('Error en toggleInstitucionEstado:', err);
+  } finally {
+    setUpdating(null);
+  }
+};
+
 
   // Eliminar institución (solo admin)
   const eliminarInstitucion = async (idInstitucion) => {

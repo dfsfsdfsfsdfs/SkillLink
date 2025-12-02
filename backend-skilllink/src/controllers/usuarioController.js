@@ -463,9 +463,9 @@ const usuarioController = {
 // Función auxiliar para verificar permisos
 async function verificarPermisoAprobacion(rolAprobador, rolSolicitante) {
     const permisos = {
-        1: [2, 3], // Admin puede aprobar gerente y tutor
-        2: [3],    // Gerente puede aprobar tutor
-        3: []      // Tutor no puede aprobar a nadie
+        1: [1, 2, 3], // Admin puede aprobar admin, gerente y tutor
+        2: [3],       // Gerente puede aprobar tutor
+        3: []         // Tutor no puede aprobar a nadie
     };
     return permisos[rolAprobador]?.includes(rolSolicitante) || false;
 }

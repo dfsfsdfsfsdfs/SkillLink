@@ -127,5 +127,60 @@ router.patch("/:id/activar", async (req, res) => {
     res.status(500).json({ error: "Error al reactivar aula" });
   }
 });
+// GET - Aulas por institución (para gerentes)
+router.get("/institucion/:idInstitucion", async (req, res) => {
+  try {
+    const { idInstitucion } = req.params;
+    
+    const result = await pool.query(`
+      SELECT a.*, i.nombre as institucion_nombre
+      FROM public.aula a
+      LEFT JOIN public.institucion i ON a.id_institucion = i.id_institucion
+      WHERE a.activo = TRUE 
+        AND a.id_institucion = $1
+      ORDER BY a.lugar
+    `, [idInstitucion]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener aulas por institución:", error.message);
+    res.status(500).json({ error: "Error al obtener aulas" });
+  }
+});
 
+// GET - Aulas de mi institución (para gerentes autenticados)
+router.get("/mi-institucion", async (req, res) => {
+  try {
+    // Solo gerentes pueden acceder a esta ruta
+    if (req.user.id_rol !== 2) {
+      return res.status(403).json({ error: "Acceso denegado. Solo para gerentes." });
+    }
+    
+    // Obtener la institución del gerente
+    const institucionResult = await pool.query(
+      "SELECT id_institucion FROM public.institucion WHERE id_usuario_gerente = $1 AND activo = TRUE",
+      [req.user.id_usuario]
+    );
+    
+    if (institucionResult.rows.length === 0) {
+      return res.status(404).json({ error: "No tienes una institución asignada" });
+    }
+    
+    const idInstitucion = institucionResult.rows[0].id_institucion;
+    
+    const result = await pool.query(`
+      SELECT a.*, i.nombre as institucion_nombre
+      FROM public.aula a
+      LEFT JOIN public.institucion i ON a.id_institucion = i.id_institucion
+      WHERE a.activo = TRUE 
+        AND a.id_institucion = $1
+      ORDER BY a.lugar
+    `, [idInstitucion]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener aulas de mi institución:", error.message);
+    res.status(500).json({ error: "Error al obtener aulas" });
+  }
+});
 export default router;

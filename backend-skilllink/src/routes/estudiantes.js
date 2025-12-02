@@ -349,5 +349,137 @@ router.get("/por-usuario/:idUsuario", async (req, res) => {
   }
 });
 
+// routes/estudiantes.js o routes/notas.js
 
+router.get('/:idEstudiante/tutoria/:idTutoria/notas', async (req, res) => {
+  try {
+    const { idEstudiante, idTutoria } = req.params;
+    
+    // Verificar que el estudiante está inscrito
+    const inscripcion = await pool.query(
+      `SELECT * FROM inscripcion 
+       WHERE id_estudiante = $1 
+         AND id_tutoria = $2 
+         AND estado_solicitud = 'inscrito' 
+         AND activo = TRUE`,
+      [idEstudiante, idTutoria]
+    );
+    
+    if (inscripcion.rows.length === 0) {
+      return res.status(404).json({ error: 'Estudiante no inscrito en esta tutoría' });
+    }
+    
+    // Obtener actividades calificadas
+    const actividades = await pool.query(`
+      SELECT 
+        a.id_actividad,
+        a.titulo,
+        a.descripcion,
+        a.fecha_entrega,
+        ac.calificacion,
+        ac.fecha_calificacion,
+        ac.observaciones
+      FROM actividad a
+      LEFT JOIN actividad_calificacion ac ON a.id_actividad = ac.id_actividad 
+        AND ac.id_estudiante = $1
+      WHERE a.id_tutoria = $2 
+        AND a.activo = TRUE
+      ORDER BY a.fecha_entrega DESC
+    `, [idEstudiante, idTutoria]);
+    
+    // Obtener evaluaciones calificadas
+    const evaluaciones = await pool.query(`
+      SELECT 
+        e.id_evaluacion,
+        e.titulo,
+        e.descripcion,
+        e.fecha_evaluacion,
+        ec.calificacion,
+        ec.fecha_calificacion,
+        ec.observaciones
+      FROM evaluacion e
+      LEFT JOIN evaluacion_calificacion ec ON e.id_evaluacion = ec.id_evaluacion 
+        AND ec.id_estudiante = $1
+      WHERE e.id_tutoria = $2 
+        AND e.activo = TRUE
+      ORDER BY e.fecha_evaluacion DESC
+    `, [idEstudiante, idTutoria]);
+    
+    // Calcular totales
+    const totalActividades = actividades.rows.length;
+    const totalEvaluaciones = evaluaciones.rows.length;
+    
+    res.json({
+      actividades: actividades.rows,
+      evaluaciones: evaluaciones.rows,
+      total_actividades: totalActividades,
+      total_evaluaciones: totalEvaluaciones,
+      total_calificaciones: totalActividades + totalEvaluaciones
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo notas:', error);
+    res.status(500).json({ error: 'Error al obtener notas del estudiante' });
+  }
+});
+
+router.get('/:idEstudiante/resumen-notas', async (req, res) => {
+  try {
+    const { idEstudiante } = req.params;
+    
+    // Obtener todas las tutorías con sus calificaciones
+    const tutorias = await pool.query(`
+      SELECT 
+        t.id_tutoria,
+        t.nombre_tutoria,
+        t.sigla,
+        i.nombre as institucion_nombre,
+        CONCAT(tu.nombre, ' ', tu.apellido_paterno) as tutor_nombre,
+        ins.calificacion_acumulada,
+        (
+          SELECT COALESCE(SUM(ac.calificacion), 0)
+          FROM actividad_calificacion ac
+          JOIN actividad a ON ac.id_actividad = a.id_actividad
+          WHERE ac.id_estudiante = $1 
+            AND a.id_tutoria = t.id_tutoria
+        ) as puntos_actividades,
+        (
+          SELECT COALESCE(SUM(ec.calificacion), 0)
+          FROM evaluacion_calificacion ec
+          JOIN evaluacion e ON ec.id_evaluacion = e.id_evaluacion
+          WHERE ec.id_estudiante = $1 
+            AND e.id_tutoria = t.id_tutoria
+        ) as puntos_evaluaciones
+      FROM tutoria t
+      JOIN institucion i ON t.id_institucion = i.id_institucion
+      JOIN tutor tu ON t.id_tutor = tu.id_tutor
+      JOIN inscripcion ins ON t.id_tutoria = ins.id_tutoria
+      WHERE ins.id_estudiante = $1 
+        AND ins.estado_solicitud = 'inscrito'
+        AND ins.activo = TRUE
+        AND t.activo = TRUE
+      ORDER BY t.nombre_tutoria
+    `, [idEstudiante]);
+    
+    // Calcular estadísticas
+    const estadisticas = {
+      total_tutorias: tutorias.rows.length,
+      aprobadas: tutorias.rows.filter(t => t.calificacion_acumulada >= 51).length,
+      reprobadas: tutorias.rows.filter(t => t.calificacion_acumulada < 51).length,
+      promedio_general: tutorias.rows.length > 0 
+        ? tutorias.rows.reduce((sum, t) => sum + (t.calificacion_acumulada || 0), 0) / tutorias.rows.length 
+        : 0
+    };
+    
+    res.json({
+      tutorias: tutorias.rows,
+      estadisticas,
+      fecha_consulta: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo resumen de notas:', error);
+    res.status(500).json({ error: 'Error al obtener resumen de notas' });
+  }
+});
 export default router;

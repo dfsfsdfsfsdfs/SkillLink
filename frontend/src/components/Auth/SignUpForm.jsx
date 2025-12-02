@@ -84,20 +84,27 @@ export default function SignUpForm({ onClose }) {
     fetchInstituciones();
   }, []);
 
-  const fetchInstituciones = async () => {
-    try {
-      // CORREGIDO: Quitar /api/ de la URL
-      const response = await fetch('http://localhost:3000/instituciones');
-      if (response.ok) {
-        const data = await response.json();
-        setInstituciones(data || []);
-      } else {
-        console.error('Error cargando instituciones:', response.status);
-      }
-    } catch (error) {
-      console.error('Error cargando instituciones:', error);
+const fetchInstituciones = async () => {
+  try {
+    // Usar la ruta pública que creamos
+    const response = await fetch('http://localhost:3000/instituciones/public/activas');
+    console.log('Fetching instituciones from:', 'http://localhost:3000/instituciones/public/activas');
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Instituciones cargadas:', data);
+      setInstituciones(data || []);
+    } else {
+      console.error('❌ Error cargando instituciones. Status:', response.status);
+      const errorText = await response.text();
+      console.error('❌ Error detallado:', errorText);
+      setInstituciones([]); // Asegurar que sea array vacío
     }
-  };
+  } catch (error) {
+    console.error('❌ Error en fetchInstituciones:', error);
+    setInstituciones([]); // Asegurar que sea array vacío
+  }
+};
 
   const handleChange = (e) => {
     setFormData({

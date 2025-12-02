@@ -33,6 +33,8 @@ const TutoriaDetalles = () => {
   const [contadorPreguntas, setContadorPreguntas] = useState(0);
   const [estudianteInscrito, setEstudianteInscrito] = useState(false);
 
+  
+
   const [estudiantesInscritos, setEstudiantesInscritos] = useState([]);
   const [loadingEstudiantesInscritos, setLoadingEstudiantesInscritos] = useState(false);
   // Determinar permisos según el rol
@@ -217,32 +219,62 @@ const puedeVerPendientes = () => {
     return getAuthToken ? getAuthToken() : localStorage.getItem('authToken');
   };
 
-  // Cargar aulas disponibles - MODIFICADO para filtrar por institución si es gerente
-  const cargarAulas = async () => {
-    try {
-      setLoadingAulas(true);
-      const token = getToken();
+// Cargar aulas disponibles - VERSIÓN SIMPLIFICADA (igual para todos)
+const cargarAulas = async () => {
+  try {
+    setLoadingAulas(true);
+    const token = getToken();
+    
+    console.log('🔍 Cargando aulas...');
+    console.log('👤 Rol usuario:', userRole);
+    console.log('🔐 Token presente:', !!token);
+
+    const response = await fetch('http://localhost:3000/aulas', {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('📡 Status de respuesta:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Error cargando aulas:', errorText);
       
-      let url = 'http://localhost:3000/aulas';
-      // Si es gerente, cargar solo aulas de su institución
-      if (isGerente && tutoria) {
-        url = `http://localhost:3000/aulas/institucion/${tutoria.id_institucion}`;
+      // Si es error 401/403, el problema es de autenticación
+      if (response.status === 401 || response.status === 403) {
+        setError('Error de autenticación. Por favor, vuelve a iniciar sesión.');
+        return;
       }
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const aulasData = await response.json();
-        setAulas(aulasData);
-      }
-    } catch (err) {
-      console.error('Error cargando aulas:', err);
-    } finally {
-      setLoadingAulas(false);
+      
+      throw new Error(`Error ${response.status}: ${errorText}`);
     }
-  };
+
+    const aulasData = await response.json();
+    console.log(`✅ ${aulasData.length} aulas cargadas`);
+    
+    // Debug: mostrar primeras 3 aulas
+    if (aulasData.length > 0) {
+      console.log('📋 Primeras aulas:', aulasData.slice(0, 3).map(a => ({
+        id: a.id_aula,
+        lugar: a.lugar,
+        institucion: a.id_institucion,
+        nombre_institucion: a.institucion_nombre
+      })));
+    }
+    
+    setAulas(aulasData);
+    setError(null);
+    
+  } catch (err) {
+    console.error('❌ Error completo cargando aulas:', err);
+    setError('Error al cargar las aulas: ' + err.message);
+    setAulas([]); // Asegurar array vacío
+  } finally {
+    setLoadingAulas(false);
+  }
+};
 
   // Cargar estudiantes disponibles para inscripción
   const cargarEstudiantesDisponibles = async () => {

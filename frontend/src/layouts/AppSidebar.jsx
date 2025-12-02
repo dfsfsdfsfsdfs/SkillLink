@@ -97,9 +97,7 @@ const navItems = [
     icon: <CreditCardIcon />,
     name: "Pagos",
     subItems: [
-      { name: "Realizar Pago", path: "/pagos/realizar", pro: false },
       { name: "Historial de Pagos", path: "/pagos/historial", pro: false },
-      { name: "Facturas", path: "/pagos/facturas", pro: false },
       { name: "Reportes Financieros", path: "/pagos/reportes", pro: false }
     ],
   },
@@ -132,9 +130,7 @@ const AppSidebar = () => {
     if (isAdmin || isGerente) {
       // Admin y Gerente ven todo
       return [
-        { name: "Realizar Pago", path: "/dashboard/pagos/realizar", pro: false },
         { name: "Historial de Pagos", path: "/dashboard/pagos/historial", pro: false },
-        { name: "Facturas", path: "/dashboard/pagos/facturas", pro: false },
         { name: "Reportes Financieros", path: "/dashboard/pagos/reportes", pro: false }
       ];
     } else if (isTutor) {
@@ -145,14 +141,12 @@ const AppSidebar = () => {
     } else if (isEstudiante) {
       // Estudiante ve solo Realizar Pago y Historial de Pagos
       return [
-        { name: "Realizar Pago", path: "/dashboard/pagos/realizar", pro: false },
         { name: "Historial de Pagos", path: "/dashboard/pagos/historial", pro: false }
       ];
     }
     
     // Por defecto, mostrar opciones básicas
     return [
-      { name: "Realizar Pago", path: "/dashboard/pagos/realizar", pro: false },
       { name: "Historial de Pagos", path: "/dashboard/pagos/historial", pro: false }
     ];
   };
